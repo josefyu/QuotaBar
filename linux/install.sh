@@ -13,10 +13,21 @@ echo "==> Checking dependencies"
 missing=()
 "$PYTHON" -c "import gi" 2>/dev/null || missing+=("python3-gi")
 "$PYTHON" -c "import cairo" 2>/dev/null || missing+=("python3-gi-cairo")
+# The tray accepts either binding, so only complain when both are absent.
 "$PYTHON" - <<'EOF' 2>/dev/null || missing+=("gir1.2-ayatanaappindicator3-0.1")
+import importlib
+
 import gi
-gi.require_version("AyatanaAppIndicator3", "0.1")
-import gi.repository.AyatanaAppIndicator3
+
+for namespace in ("AyatanaAppIndicator3", "AppIndicator3"):
+    try:
+        gi.require_version(namespace, "0.1")
+        importlib.import_module(f"gi.repository.{namespace}")
+    except (ValueError, ImportError):
+        continue
+    break
+else:
+    raise SystemExit(1)
 EOF
 
 if [ ${#missing[@]} -gt 0 ]; then
@@ -35,7 +46,7 @@ echo "==> Installing launcher into $BIN_DIR"
 mkdir -p "$BIN_DIR"
 cat > "$LAUNCHER" <<EOF
 #!/usr/bin/env bash
-exec $PYTHON -m claude_usage_monitor "\$@"
+exec "$PYTHON" -m claude_usage_monitor "\$@"
 EOF
 chmod +x "$LAUNCHER"
 

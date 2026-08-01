@@ -174,7 +174,11 @@ class TrayApp:
             return False
 
         self._refresh_usage_labels(usage)
-        self._set_icon(usage.session.percentage, usage.weekly.percentage)
+        self._set_icon(
+            usage.session.percentage,
+            usage.weekly.percentage,
+            self._codex_session_percentage(),
+        )
         self._apply_panel_label()
         self._maybe_notify(usage)
         return False
@@ -191,10 +195,14 @@ class TrayApp:
         self._status_item.set_label(
             f"Stand: {usage.fetched_at.astimezone().strftime('%H:%M:%S')}"
         )
-        self._indicator.set_title(
+        title = (
             f"Claude Usage — 5h {usage.session.percentage:.0f}%, "
             f"7d {usage.weekly.percentage:.0f}%"
         )
+        codex = self._codex_session_percentage()
+        if codex is not None:
+            title += f" · Codex 5h {codex:.0f}%"
+        self._indicator.set_title(title)
 
     def _set_codex_rows(self, labels: list[str]) -> None:
         """Show one menu row per label; hide the rest and the section divider."""
@@ -223,6 +231,13 @@ class TrayApp:
                 f"{format_countdown(window.seconds_until_reset)}"
             )
         self._set_codex_rows(labels)
+
+    def _codex_session_percentage(self) -> float | None:
+        """Codex 5h window, drawn as the innermost icon ring."""
+        if self._snapshot is None or self._snapshot.codex is None:
+            return None
+        window = self._snapshot.codex.short or self._snapshot.codex.long
+        return window.percentage if window is not None else None
 
     def _codex_headline_percentage(self) -> float | None:
         """Highest Codex window, used for the compact panel label."""
@@ -258,12 +273,14 @@ class TrayApp:
         )
         self._indicator.set_label(text, "100% · 100% | Cx 100%")
 
-    def _set_icon(self, session: float | None, weekly: float | None) -> None:
+    def _set_icon(
+        self, session: float | None, weekly: float | None, codex: float | None = None
+    ) -> None:
         # Alternating file names force the panel to reload the changed image.
         self._icon_slot ^= 1
         name = f"usage-{self._icon_slot}"
         try:
-            render_icon(self._icon_dir / f"{name}.png", session, weekly)
+            render_icon(self._icon_dir / f"{name}.png", session, weekly, codex)
         except (OSError, MemoryError):
             self._indicator.set_icon_full("dialog-information", "Claude Usage")
             return
