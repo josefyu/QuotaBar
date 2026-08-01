@@ -4,8 +4,8 @@ version = "1.4.9"
 edition = "2021"
 license = "MIT"
 description = "Claude Code Usage Monitor"
-homepage = "https://codezeno.com.au"
-repository = "https://github.com/CodeZeno/Claude-Code-Usage-Monitor"
+homepage = "https://github.com/josefyu/QuotaBar"
+repository = "https://github.com/josefyu/QuotaBar"
 
 [package.metadata.winres]
 CompanyName = "Code Zeno Pty Ltd"

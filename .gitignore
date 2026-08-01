@@ -7,6 +7,13 @@
 # Debug/log files
 *.log
 
+# Python bytecode generated when using the Linux monitor
+__pycache__/
+*.py[cod]
+
+# Local Claude Code session notes
+.claude/session.md
+
 # IDE
 .idea/
 .vscode/

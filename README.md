@@ -1,7 +1,63 @@
 ![Windows](https://img.shields.io/badge/platform-Windows-blue)
+![Linux](https://img.shields.io/badge/platform-Linux-green)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # Claude Code Usage Monitor
+
+This repository contains the original Windows taskbar monitor and a Linux system-tray implementation. Both show the current Claude Code usage windows; the Linux monitor can also show Codex usage when the Codex CLI is signed in.
+
+**Source:** [github.com/josefyu/QuotaBar](https://github.com/josefyu/QuotaBar)
+
+## Linux
+
+The Linux implementation lives in [`linux/`](linux/) and is a native Python/Gtk/AppIndicator tray application. It reads the same local Claude and optional Codex credentials as the upstream project and queries the respective provider usage endpoints. It does not need a web service or a Python virtual environment.
+
+### Requirements
+
+- A Linux desktop with an AppIndicator-compatible tray (for example GNOME with AppIndicator support)
+- Python 3
+- Claude Code installed and authenticated
+- Optional: Codex CLI installed and authenticated
+- Debian/Ubuntu packages: `python3-gi`, `python3-gi-cairo`, and `gir1.2-ayatanaappindicator3-0.1`
+
+### Install and run
+
+```bash
+cd linux
+./install.sh
+claude-usage-monitor --once
+claude-usage-monitor &
+```
+
+`install.sh` creates a user-local launcher at `~/.local/bin/claude-usage-monitor` and an XDG autostart entry. It checks for missing system dependencies before making changes.
+
+Terminal modes are also available:
+
+```bash
+claude-usage-monitor --once
+claude-usage-monitor --once --json
+claude-usage-monitor --watch --interval 300
+```
+
+The Linux configuration is stored at `~/.config/claude-usage-monitor/config.json` (or the equivalent under `XDG_CONFIG_HOME`).
+
+### Linux features
+
+- Claude Code 5-hour and 7-day windows with live reset countdowns
+- Optional Codex usage windows
+- Status icon with usage thresholds and optional desktop notifications
+- Tray controls for manual refresh, polling interval, panel label, notifications, and quit
+- Automatic refresh of expired local Claude/Codex credentials through their respective CLIs
+
+## Attribution
+
+The Windows implementation was originally created by [Craig Constable / CodeZeno](https://github.com/CodeZeno/Claude-Code-Usage-Monitor). This project retains the original MIT license and copyright notice.
+
+The Linux implementation in [`linux/`](linux/) was added as an independent adaptation for Linux desktop use. It is maintained in [josefyu/QuotaBar](https://github.com/josefyu/QuotaBar) by [josefyu](https://github.com/josefyu), with implementation assistance from Claude Code.
+
+## Windows
+
+The sections below document the original Windows application.
 
 ![Screenshot](.github/animation.gif)
 
@@ -43,13 +99,13 @@ If you use Claude Code through WSL, that is supported too. The monitor can read 
 
 ## Install
 
-Install the latest version from WinGet:
+For the original Windows distribution, install the latest upstream version from WinGet:
 
 ```powershell
 winget install CodeZeno.ClaudeCodeUsageMonitor
 ```
 
-If you prefer not to use WinGet, you can still download the latest `claude-code-usage-monitor.exe` from the [Releases](https://github.com/CodeZeno/Claude-Code-Usage-Monitor/releases) page and run it directly.
+If you prefer not to use WinGet, download the latest upstream `claude-code-usage-monitor.exe` from the [CodeZeno Releases](https://github.com/CodeZeno/Claude-Code-Usage-Monitor/releases) page and run it directly.
 
 ## Use
 
