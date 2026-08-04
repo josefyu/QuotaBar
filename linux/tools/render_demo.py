@@ -24,11 +24,11 @@ import cairo  # noqa: E402
 from PIL import Image  # noqa: E402
 
 from claude_usage_monitor.formatting import format_countdown, format_panel_label  # noqa: E402
-from claude_usage_monitor.icon import render_icon, severity_color  # noqa: E402
+from claude_usage_monitor.icon import INNER, OUTER, render_rings, severity_color  # noqa: E402
 
-WIDTH, HEIGHT = 520, 150
+WIDTH, HEIGHT = 520, 216
 ICON_RENDER_SIZE = 64
-ICON_DRAW_SIZE = 104
+ICON_DRAW_SIZE = 72
 FRAME_COUNT = 36
 FRAME_DELAY_MS = 110
 PALETTE_COLORS = 48
@@ -42,11 +42,13 @@ MUTED = (0.62, 0.64, 0.68)
 CLAUDE_SESSION_RANGE = (8.0, 94.0)
 CLAUDE_WEEKLY_RANGE = (31.0, 68.0)
 CODEX_SESSION_RANGE = (5.0, 47.0)
+CODEX_WEEKLY_RANGE = (17.0, 83.0)
 
 # Reset countdowns tick down over the animation, in seconds.
 CLAUDE_SESSION_RESET = (4 * 3600, 40 * 60)
 CLAUDE_WEEKLY_RESET = (5 * 86400, 3 * 86400)
 CODEX_SESSION_RESET = (3 * 3600, 25 * 60)
+CODEX_WEEKLY_RESET = (6 * 86400, 2 * 86400)
 
 
 def ease(progress: float) -> float:
@@ -85,19 +87,40 @@ def _draw_bar(ctx: cairo.Context, x: float, y: float, width: float, percentage: 
     ctx.fill()
 
 
-def _row(ctx: cairo.Context, y: float, label: str, percentage: float, reset_seconds: float) -> None:
-    _draw_text(ctx, 168, y, label, 15, TEXT, bold=True)
-    _draw_text(ctx, 232, y, f"{percentage:3.0f}%", 15, severity_color(percentage)[:3])
-    _draw_bar(ctx, 282, y - 10, 150, percentage)
-    _draw_text(ctx, 446, y, format_countdown(reset_seconds), 12, MUTED)
+def _row(
+    ctx: cairo.Context,
+    y: float,
+    label: str,
+    window: str,
+    percentage: float,
+    reset_seconds: float,
+) -> None:
+    _draw_text(ctx, 130, y, label, 14, TEXT, bold=True)
+    _draw_text(ctx, 192, y, window, 12, MUTED)
+    _draw_text(ctx, 222, y, f"{percentage:3.0f}%", 14, severity_color(percentage)[:3])
+    _draw_bar(ctx, 268, y - 10, 148, percentage)
+    _draw_text(ctx, 430, y, format_countdown(reset_seconds), 11, MUTED)
 
 
-def render_frame(icon_path: Path, progress: float) -> Image.Image:
+def _draw_icon(ctx: cairo.Context, icon_path: Path, x: float, y: float) -> None:
+    icon = cairo.ImageSurface.create_from_png(str(icon_path))
+    scale = ICON_DRAW_SIZE / ICON_RENDER_SIZE
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.scale(scale, scale)
+    ctx.set_source_surface(icon, 0, 0)
+    ctx.paint()
+    ctx.restore()
+
+
+def render_frame(claude_icon: Path, codex_icon: Path, progress: float) -> Image.Image:
     claude_session = lerp(CLAUDE_SESSION_RANGE, progress)
     claude_weekly = lerp(CLAUDE_WEEKLY_RANGE, progress)
     codex_session = lerp(CODEX_SESSION_RANGE, progress)
+    codex_weekly = lerp(CODEX_WEEKLY_RANGE, progress)
 
-    render_icon(icon_path, claude_session, claude_weekly, codex_session)
+    render_rings(claude_icon, ((OUTER, claude_session), (INNER, claude_weekly)), "C")
+    render_rings(codex_icon, ((OUTER, codex_session), (INNER, codex_weekly)), "X")
 
     surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, WIDTH, HEIGHT)
     ctx = cairo.Context(surface)
@@ -108,24 +131,17 @@ def render_frame(icon_path: Path, progress: float) -> Image.Image:
     ctx.rectangle(0, 0, WIDTH, 34)
     ctx.fill()
 
-    panel_label = format_panel_label(claude_session, claude_weekly, codex_session)
     _draw_text(ctx, 20, 22, "GNOME panel", 12, MUTED)
-    _draw_text(ctx, 372, 22, panel_label, 13, TEXT, bold=True)
+    _draw_text(ctx, 288, 22, format_panel_label("Cl", claude_session, claude_weekly), 13, TEXT, bold=True)
+    _draw_text(ctx, 400, 22, format_panel_label("Cx", codex_session, codex_weekly), 13, TEXT, bold=True)
 
-    icon = cairo.ImageSurface.create_from_png(str(icon_path))
-    scale = ICON_DRAW_SIZE / ICON_RENDER_SIZE
-    ctx.save()
-    ctx.translate(36, 34 + (HEIGHT - 34 - ICON_DRAW_SIZE) / 2)
-    ctx.scale(scale, scale)
-    ctx.set_source_surface(icon, 0, 0)
-    ctx.paint()
-    ctx.restore()
+    _draw_icon(ctx, claude_icon, 30, 50)
+    _draw_icon(ctx, codex_icon, 30, 50 + ICON_DRAW_SIZE + 10)
 
-    _row(ctx, 72, "Claude", claude_session, lerp(CLAUDE_SESSION_RESET, progress))
-    _draw_text(ctx, 168, 88, "5h", 11, MUTED)
-    _row(ctx, 108, "Claude", claude_weekly, lerp(CLAUDE_WEEKLY_RESET, progress))
-    _draw_text(ctx, 168, 124, "7d", 11, MUTED)
-    _row(ctx, 144, "Codex", codex_session, lerp(CODEX_SESSION_RESET, progress))
+    _row(ctx, 80, "Claude", "5h", claude_session, lerp(CLAUDE_SESSION_RESET, progress))
+    _row(ctx, 110, "Claude", "7d", claude_weekly, lerp(CLAUDE_WEEKLY_RESET, progress))
+    _row(ctx, 162, "Codex", "5h", codex_session, lerp(CODEX_SESSION_RESET, progress))
+    _row(ctx, 192, "Codex", "7d", codex_weekly, lerp(CODEX_WEEKLY_RESET, progress))
 
     surface.flush()
     data = bytes(surface.get_data())
@@ -141,12 +157,13 @@ def main() -> int:
 
     frames: list[Image.Image] = []
     with tempfile.TemporaryDirectory() as tmp:
-        icon_path = Path(tmp) / "icon.png"
+        claude_icon = Path(tmp) / "claude.png"
+        codex_icon = Path(tmp) / "codex.png"
         for index in range(FRAME_COUNT):
             # Ramp up over the first half, back down over the second.
             raw = index / (FRAME_COUNT - 1)
             progress = ease(raw * 2.0 if raw <= 0.5 else (1.0 - raw) * 2.0)
-            frames.append(render_frame(icon_path, progress))
+            frames.append(render_frame(claude_icon, codex_icon, progress))
 
     # One palette for every frame: a per-frame palette would make the flat
     # background shimmer between frames.

@@ -45,6 +45,11 @@ class Snapshot:
         return cls(usage=None, error=message, needs_login=needs_login, at=datetime.now(timezone.utc))
 
 
+def codex_is_visible(snapshot: Snapshot) -> bool:
+    """Codex earns a panel slot as soon as it reports either data or a problem."""
+    return snapshot.codex is not None or snapshot.codex_error is not None
+
+
 def _poll_claude() -> Snapshot:
     try:
         creds = credentials.get_valid_credentials()

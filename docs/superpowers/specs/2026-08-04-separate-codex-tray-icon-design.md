@@ -98,8 +98,8 @@ jeden Snapshot:
 | `codex_error` gesetzt | — | `ACTIVE`, Fehler-Icon + Fehlertext |
 | `codex` gesetzt | — | `ACTIVE`, Ringe + Zeilen |
 
-Für die Sichtbarkeitsregel gibt es eine freie Funktion, damit sie ohne GTK
-testbar ist:
+Die Sichtbarkeitsregel ist eine freie Funktion in `poller.py` — beim Snapshot,
+den sie liest, und damit ohne GTK-Import testbar:
 
 ```python
 def codex_is_visible(snapshot: Snapshot) -> bool:

@@ -34,12 +34,17 @@ def format_bar(percentage: float, width: int = 24) -> str:
     return "█" * filled + "░" * (width - filled)
 
 
+def format_percentage(percentage: float | None) -> str:
+    return "—" if percentage is None else f"{percentage:.0f}%"
+
+
 def format_panel_label(
-    session_percentage: float,
-    weekly_percentage: float,
-    codex_percentage: float | None = None,
+    prefix: str,
+    session_percentage: float | None,
+    weekly_percentage: float | None,
 ) -> str:
-    label = f"{session_percentage:.0f}% · {weekly_percentage:.0f}%"
-    if codex_percentage is not None:
-        label += f" | Cx {codex_percentage:.0f}%"
-    return label
+    """Compact panel text for one source, e.g. ``Cl 80% · 40%``."""
+    return (
+        f"{prefix} {format_percentage(session_percentage)} · "
+        f"{format_percentage(weekly_percentage)}"
+    )
