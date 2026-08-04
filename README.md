@@ -2,27 +2,50 @@
 ![Windows](https://img.shields.io/badge/platform-Windows-blue)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# Claude Code Usage Monitor
+# QuotaBar
 
-This repository contains the original Windows taskbar monitor and a Linux system-tray implementation. Both show the current Claude Code usage windows; the Linux monitor can also show Codex usage when the Codex CLI is signed in.
+> A local quota monitor for AI coding agents.
 
-**Source:** [github.com/josefyu/QuotaBar](https://github.com/josefyu/QuotaBar)
+QuotaBar keeps the usage windows of your authenticated coding agents visible
+without a browser tab. The actively maintained Linux tray app shows **Claude
+Code** and **Codex CLI** side by side, with live reset countdowns and threshold
+alerts. It uses your local CLI credentials directly; there is no backend service
+or Python virtual environment.
 
-## Linux
+| Platform | Current scope |
+| --- | --- |
+| **Linux** | Native AppIndicator tray app for Claude Code and Codex CLI |
+| **Windows** | Original upstream taskbar monitor, retained in this repository |
 
-The Linux implementation lives in [`linux/`](linux/) and is a native Python/Gtk/AppIndicator tray application. It reads the same local Claude and optional Codex credentials as the upstream project and queries the respective provider usage endpoints. It does not need a web service or a Python virtual environment.
+**Repository:** [github.com/josefyu/QuotaBar](https://github.com/josefyu/QuotaBar)
+
+## Linux — Claude Code and Codex CLI
+
+The Linux implementation lives in [`linux/`](linux/) and is the recommended
+QuotaBar experience.
 
 ![Linux tray monitor](.github/linux-tray.gif)
 
 This image is rendered by the monitor itself: [`linux/tools/render_demo.py`](linux/tools/render_demo.py) uses the same icon code as the tray, so it is not a desktop screenshot.
 
+### What you get
+
+- Separate, matching Claude (`C`) and Codex (`X`) tray indicators
+- 5-hour and 7-day quota windows, reset countdowns, and warning notifications
+- Manual refresh, configurable polling interval, and optional panel labels
+- Automatic local-CLI refresh for expired credentials
+- Headless terminal and JSON modes for scripts or SSH sessions
+
 ### Requirements
 
-- A Linux desktop with an AppIndicator-compatible tray (for example GNOME with AppIndicator support)
-- Python 3
-- Claude Code installed and authenticated
-- Optional: Codex CLI installed and authenticated
-- Debian/Ubuntu packages: `python3-gi`, `python3-gi-cairo`, and either `gir1.2-ayatanaappindicator3-0.1` or `gir1.2-appindicator3-0.1`
+| Required | Optional |
+| --- | --- |
+| Linux desktop with an AppIndicator-compatible tray | Codex CLI, installed and signed in |
+| Python 3 | Desktop notifications (`gir1.2-notify-0.7`) |
+| Claude Code, installed and signed in | |
+
+On Debian/Ubuntu, QuotaBar installs `python3-gi`, `python3-gi-cairo`, and an
+Ayatana/AppIndicator binding during the one-command setup below.
 
 ### Install and run
 
@@ -32,7 +55,12 @@ On a Debian/Ubuntu desktop, the first-time setup and immediate start are one com
 cd /path/to/QuotaBar && ./linux/install.sh --install-deps --start
 ```
 
-`--install-deps` installs the required AppIndicator packages through `apt` (and may ask for your sudo password). `--start` launches the tray monitor immediately. Later starts need only:
+`--install-deps` installs the required AppIndicator packages through `apt` and
+may ask for your sudo password. `--start` launches the tray monitor immediately.
+QuotaBar also creates an XDG autostart entry, so it starts automatically at your
+next desktop login.
+
+Later starts need only:
 
 ```bash
 claude-usage-monitor &
@@ -44,17 +72,9 @@ To check credentials and usage before starting the tray:
 claude-usage-monitor --once
 ```
 
-`install.sh` creates a user-local launcher at `~/.local/bin/claude-usage-monitor` and an XDG autostart entry. It checks for missing system dependencies before making changes.
-
-The Linux configuration is stored at `~/.config/claude-usage-monitor/config.json` (or the equivalent under `XDG_CONFIG_HOME`).
-
-### Linux features
-
-- Claude Code 5-hour and 7-day windows with live reset countdowns
-- Optional Codex usage windows
-- Status icon with usage thresholds and optional desktop notifications
-- Tray controls for manual refresh, polling interval, panel label, notifications, and quit
-- Automatic refresh of expired local Claude/Codex credentials through their respective CLIs
+The launcher is installed at `~/.local/bin/claude-usage-monitor`. Settings live
+in `~/.config/claude-usage-monitor/config.json` (or the equivalent under
+`XDG_CONFIG_HOME`).
 
 ### Tray icons
 
@@ -68,7 +88,7 @@ The Codex indicator is shown only when the Codex CLI is signed in. Without Codex
 
 Ring colors follow the configured usage thresholds: green below 50%, yellow from 50%, orange from the warning threshold, and red from the critical threshold. If no Claude usage data can be read, the tray shows an error icon.
 
-### Panel label
+### Panel labels
 
 The optional text labels next to the icons use this format:
 
@@ -102,17 +122,19 @@ claude-usage-monitor --once --json
 claude-usage-monitor --watch --interval 300
 ```
 
-### Privacy on Linux
+### Privacy and data handling
 
 The Linux monitor reads local credentials from `~/.claude/.credentials.json` and, when present, `$CODEX_HOME/auth.json` or `~/.codex/auth.json`.
 
-Network access is limited to Anthropic's Claude usage lookup, including the Messages API fallback used by the upstream monitor when the usage endpoint is unavailable, and ChatGPT's Codex usage endpoint for Codex usage. There is no update check, telemetry, or backend service in the Linux implementation.
+Network access is limited to Anthropic's Claude usage lookup (including its
+Messages API fallback) and ChatGPT's Codex usage endpoint. There is no update
+check, telemetry, or backend service in the Linux implementation.
 
 Expired tokens are refreshed by invoking the respective local CLI. The monitor does not write credential files itself.
 
 The only local monitor state is `~/.config/claude-usage-monitor/config.json`, which stores the polling interval, panel-label toggle, and notification toggle. It does not store window position, language, or update-check timestamps.
 
-### How it works on Linux
+### How it works
 
 The Linux monitor reads local credentials, queries the provider usage endpoints, renders the tray icon as a PNG in `XDG_RUNTIME_DIR`, and passes that icon to AppIndicator.
 
@@ -128,9 +150,15 @@ python3 linux/tools/render_demo.py
 
 The Windows implementation was originally created by [Craig Constable / CodeZeno](https://github.com/CodeZeno/Claude-Code-Usage-Monitor). This project retains the original MIT license and copyright notice.
 
-The Linux implementation in [`linux/`](linux/) was added as an independent adaptation for Linux desktop use. It is maintained in [josefyu/QuotaBar](https://github.com/josefyu/QuotaBar) by [josefyu](https://github.com/josefyu), with implementation assistance from Claude Code.
+The Linux implementation in [`linux/`](linux/) is an independent Linux desktop
+adaptation, maintained in [josefyu/QuotaBar](https://github.com/josefyu/QuotaBar)
+by [josefyu](https://github.com/josefyu).
 
-## Windows
+## Windows — original upstream implementation
+
+The Windows code and documentation below describe the original Claude Code
+Usage Monitor. They are retained for compatibility and attribution; QuotaBar's
+Linux tray app is the actively maintained implementation in this repository.
 
 The sections below document the original upstream Windows application. WinGet and release downloads point to [CodeZeno/Claude-Code-Usage-Monitor](https://github.com/CodeZeno/Claude-Code-Usage-Monitor), not this Linux-focused fork.
 
@@ -297,17 +325,13 @@ If the newer usage endpoint is unavailable, it can fall back to reading the rate
 
 ## Account Support
 
-This app works with the same account types that Claude Code itself supports.
-
-As of **March 19, 2026**, Anthropic's Claude Code setup documentation says:
-
-- **Supported:** Pro, Max, Teams, Enterprise, and Console accounts
-- **Not supported:** the free Claude.ai plan
-
-If Anthropic changes Claude Code availability in the future, this app should follow whatever Claude Code supports, as long as the usage data remains exposed through the same authenticated endpoints.
+QuotaBar works only with accounts that can sign in to the corresponding local
+CLI and whose provider exposes usage data through its authenticated endpoint.
+Provider plans, limits, and endpoint behaviour can change; QuotaBar does not
+add account eligibility beyond Claude Code or Codex CLI themselves.
 
 ## Open Source
 
-This project is licensed under MIT.
+QuotaBar is licensed under [MIT](LICENSE).
 
 If you want to inspect the behavior or audit the code, everything is in this repository.
