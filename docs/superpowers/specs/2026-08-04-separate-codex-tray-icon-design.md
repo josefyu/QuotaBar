@@ -66,6 +66,12 @@ class IndicatorSpec:
     label_prefix: str  # "Cl" / "Cx"
 ```
 
+Beide Indicators teilen sich das Icon-Verzeichnis unter `$XDG_RUNTIME_DIR`,
+brauchen aber getrennte Dateinamen, sonst überschreiben sie sich gegenseitig.
+Der Basename kommt daher aus dem Spec: `claude-0.png`/`claude-1.png` und
+`codex-0.png`/`codex-1.png`. Das Abwechseln zwischen zwei Slots bleibt nötig,
+weil das Panel ein Bild nur bei geändertem Dateinamen neu lädt.
+
 Öffentliche Schnittstelle:
 
 - `update(short, long, fetched_at, error, hint)` — zwei `UsageWindow | None`
