@@ -26,11 +26,22 @@ This image is rendered by the monitor itself: [`linux/tools/render_demo.py`](lin
 
 ### Install and run
 
+On a Debian/Ubuntu desktop, the first-time setup and immediate start are one command:
+
 ```bash
-cd linux
-./install.sh
-claude-usage-monitor --once
+cd /path/to/QuotaBar && ./linux/install.sh --install-deps --start
+```
+
+`--install-deps` installs the required AppIndicator packages through `apt` (and may ask for your sudo password). `--start` launches the tray monitor immediately. Later starts need only:
+
+```bash
 claude-usage-monitor &
+```
+
+To check credentials and usage before starting the tray:
+
+```bash
+claude-usage-monitor --once
 ```
 
 `install.sh` creates a user-local launcher at `~/.local/bin/claude-usage-monitor` and an XDG autostart entry. It checks for missing system dependencies before making changes.
@@ -45,34 +56,33 @@ The Linux configuration is stored at `~/.config/claude-usage-monitor/config.json
 - Tray controls for manual refresh, polling interval, panel label, notifications, and quit
 - Automatic refresh of expired local Claude/Codex credentials through their respective CLIs
 
-### Tray icon
+### Tray icons
 
-The Linux tray icon uses concentric usage rings:
+Claude and Codex use separate, visually identical tray indicators. Each has two concentric usage rings:
 
-- Outer ring: Claude Code 5-hour window
-- Middle ring: Claude Code 7-day window
-- Inner ring: Codex 5-hour window, falling back to the Codex 7-day window when no 5-hour limit is reported
+- Outer ring: 5-hour window
+- Inner ring: 7-day window
+- Centre glyph: `C` for Claude or `X` for Codex
 
-The Codex ring is shown only when the Codex CLI is signed in. Without Codex credentials, the monitor renders a two-ring Claude icon.
+The Codex indicator is shown only when the Codex CLI is signed in. Without Codex credentials, only the two-ring Claude indicator is shown.
 
 Ring colors follow the configured usage thresholds: green below 50%, yellow from 50%, orange from the warning threshold, and red from the critical threshold. If no Claude usage data can be read, the tray shows an error icon.
 
 ### Panel label
 
-The optional text label next to the icon uses this format:
+The optional text labels next to the icons use this format:
 
 ```text
-42% · 68% | Cx 17%
+Cl 42% · 68%    Cx 17% · 31%
 ```
 
-The values are Claude 5-hour usage, Claude 7-day usage, and Codex usage. The label can be disabled from the tray menu entry `Text im Panel`.
+Each pair is the respective 5-hour and 7-day usage. The labels can be disabled from the tray menu entry `Text im Panel`.
 
 ### Tray menu
 
-The Linux tray menu shows:
+Each Linux tray indicator has its own menu, which shows:
 
-- Claude `5h` and `7d` rows with reset countdowns
-- Codex `5h` and `7d` rows when Codex usage is available
+- Its own `5h` and `7d` rows with reset countdowns
 - Timestamp of the last successful fetch
 - `Jetzt aktualisieren`
 - `Aktualisierungsintervall`
