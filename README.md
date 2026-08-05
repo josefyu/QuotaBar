@@ -44,16 +44,26 @@ This image is rendered by the monitor itself: [`linux/tools/render_demo.py`](lin
 | Python 3 | Desktop notifications (`gir1.2-notify-0.7`) |
 | Claude Code, installed and signed in | |
 
-On Debian/Ubuntu, QuotaBar installs `python3-gi`, `python3-gi-cairo`, and an
-Ayatana/AppIndicator binding during the one-command setup below.
+On Debian/Ubuntu, QuotaBar installs `python3-gi`, `python3-gi-cairo`,
+`gir1.2-gtk-3.0`, and an Ayatana/AppIndicator binding during the one-command
+setup below. Only packages that are actually missing are installed.
 
 ### Install and run
 
-On a Debian/Ubuntu desktop, the first-time setup and immediate start are one command:
+On a Debian/Ubuntu desktop, clone, setup and start are one command:
+
+```bash
+git clone https://github.com/josefyu/QuotaBar.git ~/QuotaBar && ~/QuotaBar/linux/install.sh --install-deps --start
+```
+
+If the repository is already on the machine, the setup alone is:
 
 ```bash
 cd /path/to/QuotaBar && ./linux/install.sh --install-deps --start
 ```
+
+Keep the clone where it is: the installer registers that directory on the
+Python path, so moving or deleting it breaks the launcher.
 
 `--install-deps` installs the required AppIndicator packages through `apt` and
 may ask for your sudo password. `--start` launches the tray monitor immediately.

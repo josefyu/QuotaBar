@@ -43,6 +43,13 @@ echo "==> Checking dependencies"
 missing=()
 "$PYTHON" -c "import gi" 2>/dev/null || missing+=("python3-gi")
 "$PYTHON" -c "import cairo" 2>/dev/null || missing+=("python3-gi-cairo")
+# Gtk itself is a separate typelib package and is absent on minimal installs.
+"$PYTHON" - <<'EOF' 2>/dev/null || missing+=("gir1.2-gtk-3.0")
+import gi
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk  # noqa: F401
+EOF
 # The tray accepts either binding, so only complain when both are absent.
 "$PYTHON" - <<'EOF' 2>/dev/null || missing+=("gir1.2-ayatanaappindicator3-0.1")
 import importlib
@@ -121,6 +128,21 @@ if ! printf '%s' ":$PATH:" | grep -q ":$BIN_DIR:"; then
 fi
 
 if "$START_AFTER_INSTALL"; then
+    if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+        echo
+        echo "Not starting the tray: no desktop session (DISPLAY and WAYLAND_DISPLAY are unset)."
+        echo "On a headless machine use the terminal mode instead:"
+        echo "  claude-usage-monitor --watch"
+        exit 0
+    fi
+
+    if pgrep -u "$(id -u)" -f "python3? -m claude_usage_monitor" >/dev/null 2>&1; then
+        echo
+        echo "==> Restarting the running tray monitor"
+        pkill -u "$(id -u)" -f "python3? -m claude_usage_monitor" || true
+        sleep 1
+    fi
+
     echo "==> Starting tray monitor"
     nohup "$LAUNCHER" >"${XDG_RUNTIME_DIR:-/tmp}/claude-usage-monitor.log" 2>&1 &
     echo "Started (PID $!). Claude and Codex appear as separate tray icons once their CLIs are signed in."
