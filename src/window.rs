@@ -561,6 +561,22 @@ fn save_settings_or_log(settings: &SettingsFile, context: &str) {
     }
 }
 
+/// Wall-clock reset time for the tray tooltip: when the window frees up again,
+/// rather than how long that takes. A reset on another day carries its weekday
+/// so a weekly window cannot be mistaken for one later today.
+fn tray_reset_clock(section: &crate::models::UsageSection, language: LanguageId) -> String {
+    let Some(resets_at) = section.resets_at else {
+        return String::new();
+    };
+    let unix = match resets_at.duration_since(std::time::UNIX_EPOCH) {
+        Ok(since_epoch) => since_epoch.as_secs_f64(),
+        Err(_) => return String::new(),
+    };
+    crate::theme_engine::format_reset_clock(unix, language.code())
+        .map(|clock| format!(" · {clock}"))
+        .unwrap_or_default()
+}
+
 fn tray_usage_summary_lines(
     data: &AppUsageData,
     providers: ProviderSet,
@@ -585,12 +601,14 @@ fn tray_usage_summary_lines(
                 .as_deref()
                 .unwrap_or(strings.weekly_window);
             Some(format!(
-                "{} {}: {:.0}% | {}: {:.0}%",
+                "{} {}: {:.0}%{} | {}: {:.0}%{}",
                 language.text(descriptor.display_name),
                 strings.session_window,
                 shown(usage.session.percentage),
+                tray_reset_clock(&usage.session, language),
                 weekly_label,
                 shown(usage.weekly.percentage),
+                tray_reset_clock(&usage.weekly, language),
             ))
         })
         .collect()

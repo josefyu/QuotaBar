@@ -239,3 +239,23 @@ fn wide_result(value: &[u16], count: i32) -> Option<String> {
 fn combine(first: Option<String>, second: Option<String>) -> Option<String> {
     Some(format!("{} {}", first?, second?))
 }
+
+/// Wall-clock reset time for the tray tooltip, e.g. `15:30` for a reset later
+/// today and `Mo 09:00` for one on another day, so a weekly window stays
+/// unambiguous without spelling out a full date.
+pub(crate) fn format_reset_clock(unix: f64, locale: &str) -> Option<String> {
+    let value = timestamp_system_time(unix, true)?;
+    let time = time_pattern(&value, "HH':'mm", locale)?;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs_f64();
+    let (target, today) = (timestamp_parts(unix, true)?, timestamp_parts(now, true)?);
+    if (target.year, target.month, target.day) == (today.year, today.month, today.day) {
+        return Some(time);
+    }
+
+    let weekday = date_pattern(&value, "ddd", locale)?;
+    Some(format!("{weekday} {time}"))
+}

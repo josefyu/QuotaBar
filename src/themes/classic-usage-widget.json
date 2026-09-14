@@ -214,7 +214,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{i18n.cursor_auto_window} {cursor.session.display:usage_line}",
+            "template": "{i18n.cursor_auto_window} {cursor.session.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -261,7 +261,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{i18n.cursor_auto_window} {cursor.session.display:usage_line}",
+            "template": "{i18n.cursor_auto_window} {cursor.session.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -308,7 +308,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{i18n.cursor_api_window} {cursor.weekly.display:usage_line}",
+            "template": "{i18n.cursor_api_window} {cursor.weekly.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -355,7 +355,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{i18n.cursor_api_window} {cursor.weekly.display:usage_line}",
+            "template": "{i18n.cursor_api_window} {cursor.weekly.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -463,7 +463,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{claude.session.display:usage_line}",
+            "template": "{claude.session.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -510,7 +510,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{claude.session.display:usage_line}",
+            "template": "{claude.session.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -557,7 +557,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{claude.weekly.display:usage_line}",
+            "template": "{claude.weekly.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -604,7 +604,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{claude.weekly.display:usage_line}",
+            "template": "{claude.weekly.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -659,7 +659,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{codex.five_hour.display:usage_line}",
+            "template": "{codex.five_hour.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -706,7 +706,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{codex.five_hour.display:usage_line}",
+            "template": "{codex.five_hour.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -753,7 +753,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{codex.weekly.display:usage_line}",
+            "template": "{codex.weekly.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -800,7 +800,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{codex.weekly.display:usage_line}",
+            "template": "{codex.weekly.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -855,7 +855,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{antigravity.session.display:usage_line}",
+            "template": "{antigravity.session.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -902,7 +902,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{antigravity.session.display:usage_line}",
+            "template": "{antigravity.session.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -949,7 +949,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{antigravity.weekly.display:usage_line}",
+            "template": "{antigravity.weekly.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -996,7 +996,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{antigravity.weekly.display:usage_line}",
+            "template": "{antigravity.weekly.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -1051,7 +1051,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{opencode.session.display:usage_line}",
+            "template": "{opencode.session.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -1098,7 +1098,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{opencode.session.display:usage_line}",
+            "template": "{opencode.session.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -1145,7 +1145,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{opencode.weekly.label} {opencode.weekly.display:usage_line}",
+            "template": "{opencode.weekly.label} {opencode.weekly.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -1192,7 +1192,7 @@
           "height": "13",
           "content": {
             "type": "text",
-            "template": "{opencode.weekly.label} {opencode.weekly.display:usage_line}",
+            "template": "{opencode.weekly.label} {opencode.weekly.display:usage_reset_line}",
             "font_family": "Segoe UI",
             "font_size": "12",
             "weight": "medium",
@@ -1493,17 +1493,19 @@
           "corner_radius": "1"
         },
         {
-          "id": "claude-tray-one-digit",
-          "name": "Claude one-digit percentage",
-          "render": "(data.poll_ok && claude.available && claude.headline.display < 9.5) && claude.credits.available == 0",
+          "id": "claude-tray-session-value",
+          "name": "claude 5h percentage",
+          "render": "data.poll_ok && claude.available && claude.credits.available == 0",
           "parent": "claude-tray-icon",
+          "x": "0",
+          "y": "1",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{claude.headline.display:0}",
+            "template": "{claude.session.display:0}",
             "font_family": "Arial Bold",
-            "font_size": "50",
+            "font_size": "30",
             "weight": "bold",
             "align": "center",
             "color": {
@@ -1512,34 +1514,33 @@
           }
         },
         {
-          "id": "claude-tray-two-digits",
-          "name": "Claude two-digit percentage",
-          "render": "(data.poll_ok && claude.available && claude.headline.display >= 9.5 && claude.headline.display < 99.5) && claude.credits.available == 0",
+          "id": "claude-tray-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && claude.available && claude.credits.available == 0",
           "parent": "claude-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{claude.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "42",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#FFFFFFFF"
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFF99"
             }
           }
         },
         {
-          "id": "claude-tray-three-digits",
-          "name": "Claude three-digit percentage",
-          "render": "(data.poll_ok && claude.available && claude.headline.display >= 99.5) && claude.credits.available == 0",
+          "id": "claude-tray-weekly-value",
+          "name": "claude 7d percentage",
+          "render": "data.poll_ok && claude.available && claude.credits.available == 0",
           "parent": "claude-tray-icon",
+          "x": "0",
+          "y": "33",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{claude.headline.display:0}",
+            "template": "{claude.weekly.display:0}",
             "font_family": "Arial Bold",
             "font_size": "30",
             "weight": "bold",
@@ -1718,53 +1719,17 @@
           }
         },
         {
-          "id": "codex-tray-low-one-digit",
-          "name": "Codex normal one-digit percentage",
-          "render": "(data.poll_ok && codex.available && codex.headline.display < 9.5 && codex.headline.percentage < 90) && codex.credits.available == 0",
+          "id": "codex-tray-low-session-value",
+          "name": "codex 5h percentage",
+          "render": "(data.poll_ok && codex.available && codex.headline.percentage < 90) && codex.credits.available == 0",
           "parent": "codex-tray-icon",
+          "x": "0",
+          "y": "1",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{codex.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "50",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#FFFFFFFF"
-            }
-          }
-        },
-        {
-          "id": "codex-tray-low-two-digits",
-          "name": "Codex normal two-digit percentage",
-          "render": "(data.poll_ok && codex.available && codex.headline.display >= 9.5 && codex.headline.display < 99.5 && codex.headline.percentage < 90) && codex.credits.available == 0",
-          "parent": "codex-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{codex.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "42",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#FFFFFFFF"
-            }
-          }
-        },
-        {
-          "id": "codex-tray-low-three-digits",
-          "name": "Codex normal three-digit percentage",
-          "render": "(data.poll_ok && codex.available && codex.headline.display >= 99.5 && codex.headline.percentage < 90) && codex.credits.available == 0",
-          "parent": "codex-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{codex.headline.display:0}",
+            "template": "{codex.five_hour.display:0}",
             "font_family": "Arial Bold",
             "font_size": "30",
             "weight": "bold",
@@ -1775,17 +1740,56 @@
           }
         },
         {
-          "id": "codex-tray-high-one-digit",
-          "name": "Codex high-usage one-digit percentage",
-          "render": "(data.poll_ok && codex.available && codex.headline.display < 9.5 && codex.headline.percentage >= 90) && codex.credits.available == 0",
+          "id": "codex-tray-low-divider",
+          "name": "window divider",
+          "render": "(data.poll_ok && codex.available && codex.headline.percentage < 90) && codex.credits.available == 0",
           "parent": "codex-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFF99"
+            }
+          }
+        },
+        {
+          "id": "codex-tray-low-weekly-value",
+          "name": "codex 7d percentage",
+          "render": "(data.poll_ok && codex.available && codex.headline.percentage < 90) && codex.credits.available == 0",
+          "parent": "codex-tray-icon",
+          "x": "0",
+          "y": "33",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{codex.headline.display:0}",
+            "template": "{codex.weekly.display:0}",
             "font_family": "Arial Bold",
-            "font_size": "50",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "codex-tray-high-session-value",
+          "name": "codex 5h percentage",
+          "render": "(data.poll_ok && codex.available && codex.headline.percentage >= 90) && codex.credits.available == 0",
+          "parent": "codex-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{codex.five_hour.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
             "weight": "bold",
             "align": "center",
             "color": {
@@ -1794,34 +1798,33 @@
           }
         },
         {
-          "id": "codex-tray-high-two-digits",
-          "name": "Codex high-usage two-digit percentage",
-          "render": "(data.poll_ok && codex.available && codex.headline.display >= 9.5 && codex.headline.display < 99.5 && codex.headline.percentage >= 90) && codex.credits.available == 0",
+          "id": "codex-tray-high-divider",
+          "name": "window divider",
+          "render": "(data.poll_ok && codex.available && codex.headline.percentage >= 90) && codex.credits.available == 0",
           "parent": "codex-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{codex.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "42",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#111111FF"
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#11111199"
             }
           }
         },
         {
-          "id": "codex-tray-high-three-digits",
-          "name": "Codex high-usage three-digit percentage",
-          "render": "(data.poll_ok && codex.available && codex.headline.display >= 99.5 && codex.headline.percentage >= 90) && codex.credits.available == 0",
+          "id": "codex-tray-high-weekly-value",
+          "name": "codex 7d percentage",
+          "render": "(data.poll_ok && codex.available && codex.headline.percentage >= 90) && codex.credits.available == 0",
           "parent": "codex-tray-icon",
+          "x": "0",
+          "y": "33",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{codex.headline.display:0}",
+            "template": "{codex.weekly.display:0}",
             "font_family": "Arial Bold",
             "font_size": "30",
             "weight": "bold",
@@ -2000,53 +2003,17 @@
           }
         },
         {
-          "id": "antigravity-tray-low-one-digit",
-          "name": "Antigravity normal one-digit percentage",
-          "render": "data.poll_ok && antigravity.available && antigravity.headline.display < 9.5 && antigravity.headline.percentage < 90",
+          "id": "antigravity-tray-low-session-value",
+          "name": "antigravity 5h percentage",
+          "render": "data.poll_ok && antigravity.available && antigravity.headline.percentage < 90",
           "parent": "antigravity-tray-icon",
+          "x": "0",
+          "y": "1",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{antigravity.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "50",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#FFFFFFFF"
-            }
-          }
-        },
-        {
-          "id": "antigravity-tray-low-two-digits",
-          "name": "Antigravity normal two-digit percentage",
-          "render": "data.poll_ok && antigravity.available && antigravity.headline.display >= 9.5 && antigravity.headline.display < 99.5 && antigravity.headline.percentage < 90",
-          "parent": "antigravity-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{antigravity.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "42",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#FFFFFFFF"
-            }
-          }
-        },
-        {
-          "id": "antigravity-tray-low-three-digits",
-          "name": "Antigravity normal three-digit percentage",
-          "render": "data.poll_ok && antigravity.available && antigravity.headline.display >= 99.5 && antigravity.headline.percentage < 90",
-          "parent": "antigravity-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{antigravity.headline.display:0}",
+            "template": "{antigravity.session.display:0}",
             "font_family": "Arial Bold",
             "font_size": "30",
             "weight": "bold",
@@ -2057,17 +2024,56 @@
           }
         },
         {
-          "id": "antigravity-tray-high-one-digit",
-          "name": "Antigravity high-usage one-digit percentage",
-          "render": "data.poll_ok && antigravity.available && antigravity.headline.display < 9.5 && antigravity.headline.percentage >= 90",
+          "id": "antigravity-tray-low-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && antigravity.available && antigravity.headline.percentage < 90",
           "parent": "antigravity-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFF99"
+            }
+          }
+        },
+        {
+          "id": "antigravity-tray-low-weekly-value",
+          "name": "antigravity 7d percentage",
+          "render": "data.poll_ok && antigravity.available && antigravity.headline.percentage < 90",
+          "parent": "antigravity-tray-icon",
+          "x": "0",
+          "y": "33",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{antigravity.headline.display:0}",
+            "template": "{antigravity.weekly.display:0}",
             "font_family": "Arial Bold",
-            "font_size": "50",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "antigravity-tray-high-session-value",
+          "name": "antigravity 5h percentage",
+          "render": "data.poll_ok && antigravity.available && antigravity.headline.percentage >= 90",
+          "parent": "antigravity-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{antigravity.session.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
             "weight": "bold",
             "align": "center",
             "color": {
@@ -2076,34 +2082,33 @@
           }
         },
         {
-          "id": "antigravity-tray-high-two-digits",
-          "name": "Antigravity high-usage two-digit percentage",
-          "render": "data.poll_ok && antigravity.available && antigravity.headline.display >= 9.5 && antigravity.headline.display < 99.5 && antigravity.headline.percentage >= 90",
+          "id": "antigravity-tray-high-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && antigravity.available && antigravity.headline.percentage >= 90",
           "parent": "antigravity-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{antigravity.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "42",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#1967D2FF"
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#1967D299"
             }
           }
         },
         {
-          "id": "antigravity-tray-high-three-digits",
-          "name": "Antigravity high-usage three-digit percentage",
-          "render": "data.poll_ok && antigravity.available && antigravity.headline.display >= 99.5 && antigravity.headline.percentage >= 90",
+          "id": "antigravity-tray-high-weekly-value",
+          "name": "antigravity 7d percentage",
+          "render": "data.poll_ok && antigravity.available && antigravity.headline.percentage >= 90",
           "parent": "antigravity-tray-icon",
+          "x": "0",
+          "y": "33",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{antigravity.headline.display:0}",
+            "template": "{antigravity.weekly.display:0}",
             "font_family": "Arial Bold",
             "font_size": "30",
             "weight": "bold",
@@ -2206,53 +2211,17 @@
           }
         },
         {
-          "id": "cursor-tray-low-one-digit",
-          "name": "Cursor normal one-digit percentage",
-          "render": "data.poll_ok && cursor.available && cursor.headline.display < 9.5 && cursor.headline.percentage < 90",
+          "id": "cursor-tray-low-session-value",
+          "name": "cursor 5h percentage",
+          "render": "data.poll_ok && cursor.available && cursor.headline.percentage < 90",
           "parent": "cursor-tray-icon",
+          "x": "0",
+          "y": "1",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{cursor.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "50",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#FFFFFFFF"
-            }
-          }
-        },
-        {
-          "id": "cursor-tray-low-two-digits",
-          "name": "Cursor normal two-digit percentage",
-          "render": "data.poll_ok && cursor.available && cursor.headline.display >= 9.5 && cursor.headline.display < 99.5 && cursor.headline.percentage < 90",
-          "parent": "cursor-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{cursor.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "42",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#FFFFFFFF"
-            }
-          }
-        },
-        {
-          "id": "cursor-tray-low-three-digits",
-          "name": "Cursor normal three-digit percentage",
-          "render": "data.poll_ok && cursor.available && cursor.headline.display >= 99.5 && cursor.headline.percentage < 90",
-          "parent": "cursor-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{cursor.headline.display:0}",
+            "template": "{cursor.session.display:0}",
             "font_family": "Arial Bold",
             "font_size": "30",
             "weight": "bold",
@@ -2263,17 +2232,56 @@
           }
         },
         {
-          "id": "cursor-tray-high-one-digit",
-          "name": "Cursor high-usage one-digit percentage",
-          "render": "data.poll_ok && cursor.available && cursor.headline.display < 9.5 && cursor.headline.percentage >= 90",
+          "id": "cursor-tray-low-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && cursor.available && cursor.headline.percentage < 90",
           "parent": "cursor-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFF99"
+            }
+          }
+        },
+        {
+          "id": "cursor-tray-low-weekly-value",
+          "name": "cursor 7d percentage",
+          "render": "data.poll_ok && cursor.available && cursor.headline.percentage < 90",
+          "parent": "cursor-tray-icon",
+          "x": "0",
+          "y": "33",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{cursor.headline.display:0}",
+            "template": "{cursor.weekly.display:0}",
             "font_family": "Arial Bold",
-            "font_size": "50",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "cursor-tray-high-session-value",
+          "name": "cursor 5h percentage",
+          "render": "data.poll_ok && cursor.available && cursor.headline.percentage >= 90",
+          "parent": "cursor-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{cursor.session.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
             "weight": "bold",
             "align": "center",
             "color": {
@@ -2282,34 +2290,33 @@
           }
         },
         {
-          "id": "cursor-tray-high-two-digits",
-          "name": "Cursor high-usage two-digit percentage",
-          "render": "data.poll_ok && cursor.available && cursor.headline.display >= 9.5 && cursor.headline.display < 99.5 && cursor.headline.percentage >= 90",
+          "id": "cursor-tray-high-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && cursor.available && cursor.headline.percentage >= 90",
           "parent": "cursor-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{cursor.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "42",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#1A1A1AFF"
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#1A1A1A99"
             }
           }
         },
         {
-          "id": "cursor-tray-high-three-digits",
-          "name": "Cursor high-usage three-digit percentage",
-          "render": "data.poll_ok && cursor.available && cursor.headline.display >= 99.5 && cursor.headline.percentage >= 90",
+          "id": "cursor-tray-high-weekly-value",
+          "name": "cursor 7d percentage",
+          "render": "data.poll_ok && cursor.available && cursor.headline.percentage >= 90",
           "parent": "cursor-tray-icon",
+          "x": "0",
+          "y": "33",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{cursor.headline.display:0}",
+            "template": "{cursor.weekly.display:0}",
             "font_family": "Arial Bold",
             "font_size": "30",
             "weight": "bold",
@@ -2412,53 +2419,17 @@
           }
         },
         {
-          "id": "opencode-tray-low-one-digit",
-          "name": "OpenCode normal one-digit percentage",
-          "render": "data.poll_ok && opencode.available && opencode.headline.display < 9.5 && opencode.headline.percentage < 90",
+          "id": "opencode-tray-low-session-value",
+          "name": "opencode 5h percentage",
+          "render": "data.poll_ok && opencode.available && opencode.headline.percentage < 90",
           "parent": "opencode-tray-icon",
+          "x": "0",
+          "y": "1",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{opencode.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "50",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#FFFFFFFF"
-            }
-          }
-        },
-        {
-          "id": "opencode-tray-low-two-digits",
-          "name": "OpenCode normal two-digit percentage",
-          "render": "data.poll_ok && opencode.available && opencode.headline.display >= 9.5 && opencode.headline.display < 99.5 && opencode.headline.percentage < 90",
-          "parent": "opencode-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{opencode.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "42",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#FFFFFFFF"
-            }
-          }
-        },
-        {
-          "id": "opencode-tray-low-three-digits",
-          "name": "OpenCode normal three-digit percentage",
-          "render": "data.poll_ok && opencode.available && opencode.headline.display >= 99.5 && opencode.headline.percentage < 90",
-          "parent": "opencode-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{opencode.headline.display:0}",
+            "template": "{opencode.session.display:0}",
             "font_family": "Arial Bold",
             "font_size": "30",
             "weight": "bold",
@@ -2469,17 +2440,56 @@
           }
         },
         {
-          "id": "opencode-tray-high-one-digit",
-          "name": "OpenCode high-usage one-digit percentage",
-          "render": "data.poll_ok && opencode.available && opencode.headline.display < 9.5 && opencode.headline.percentage >= 90",
+          "id": "opencode-tray-low-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && opencode.available && opencode.headline.percentage < 90",
           "parent": "opencode-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFF99"
+            }
+          }
+        },
+        {
+          "id": "opencode-tray-low-weekly-value",
+          "name": "opencode 7d percentage",
+          "render": "data.poll_ok && opencode.available && opencode.headline.percentage < 90",
+          "parent": "opencode-tray-icon",
+          "x": "0",
+          "y": "33",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{opencode.headline.display:0}",
+            "template": "{opencode.weekly.display:0}",
             "font_family": "Arial Bold",
-            "font_size": "50",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "opencode-tray-high-session-value",
+          "name": "opencode 5h percentage",
+          "render": "data.poll_ok && opencode.available && opencode.headline.percentage >= 90",
+          "parent": "opencode-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{opencode.session.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
             "weight": "bold",
             "align": "center",
             "color": {
@@ -2488,34 +2498,33 @@
           }
         },
         {
-          "id": "opencode-tray-high-two-digits",
-          "name": "OpenCode high-usage two-digit percentage",
-          "render": "data.poll_ok && opencode.available && opencode.headline.display >= 9.5 && opencode.headline.display < 99.5 && opencode.headline.percentage >= 90",
+          "id": "opencode-tray-high-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && opencode.available && opencode.headline.percentage >= 90",
           "parent": "opencode-tray-icon",
-          "width": "64",
-          "height": "64",
-          "content": {
-            "type": "text",
-            "template": "{opencode.headline.display:0}",
-            "font_family": "Arial Bold",
-            "font_size": "42",
-            "weight": "bold",
-            "align": "center",
-            "color": {
-              "color": "#1B5E20FF"
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#1B5E2099"
             }
           }
         },
         {
-          "id": "opencode-tray-high-three-digits",
-          "name": "OpenCode high-usage three-digit percentage",
-          "render": "data.poll_ok && opencode.available && opencode.headline.display >= 99.5 && opencode.headline.percentage >= 90",
+          "id": "opencode-tray-high-weekly-value",
+          "name": "opencode 7d percentage",
+          "render": "data.poll_ok && opencode.available && opencode.headline.percentage >= 90",
           "parent": "opencode-tray-icon",
+          "x": "0",
+          "y": "33",
           "width": "64",
-          "height": "64",
+          "height": "30",
           "content": {
             "type": "text",
-            "template": "{opencode.headline.display:0}",
+            "template": "{opencode.weekly.display:0}",
             "font_family": "Arial Bold",
             "font_size": "30",
             "weight": "bold",

@@ -2121,7 +2121,7 @@ fn display_summaries_preserve_status_reset_formatting_and_legacy_tokens() {
 }
 
 #[test]
-fn the_classic_theme_shows_one_badge_digit_group_in_both_usage_directions() {
+fn the_classic_theme_shows_one_value_per_window_in_both_usage_directions() {
     use crate::models::{UsageData, UsageSection};
 
     let theme = ThemeDocument::starter();
@@ -2156,21 +2156,26 @@ fn the_classic_theme_shows_one_badge_digit_group_in_both_usage_directions() {
                     ThemeRuntime::from_providers(ProviderSet::from_enabled([provider]))
                         .with_countdown(countdown),
                 );
-                let badges: Vec<&str> = surface
-                    .children
-                    .iter()
-                    .filter(|object| {
-                        object.id.contains("digit")
-                            && !object.id.contains("credit")
-                            && evaluate(&object.render.0, &context).unwrap_or(0.0) != 0.0
-                    })
-                    .map(|object| object.id.as_str())
-                    .collect();
-                assert_eq!(
-                    badges.len(),
-                    1,
-                    "{surface_id} at {spent}% spent with countdown {countdown}: {badges:?}"
-                );
+                // The tray icon stacks the 5-hour value over the 7-day one, so
+                // exactly one variant of each must survive the render
+                // conditions; two would overprint, none would leave it blank.
+                for window in ["session-value", "weekly-value"] {
+                    let shown: Vec<&str> = surface
+                        .children
+                        .iter()
+                        .filter(|object| {
+                            object.id.ends_with(window)
+                                && !object.id.contains("credit")
+                                && evaluate(&object.render.0, &context).unwrap_or(0.0) != 0.0
+                        })
+                        .map(|object| object.id.as_str())
+                        .collect();
+                    assert_eq!(
+                        shown.len(),
+                        1,
+                        "{surface_id} {window} at {spent}% spent with countdown {countdown}: {shown:?}"
+                    );
+                }
             }
         }
     }

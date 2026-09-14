@@ -488,6 +488,16 @@ pub fn parse_color(source: &str) -> Option<Rgba> {
 }
 
 pub(super) fn format_usage_line(base: &str, context: &DataContext) -> Option<String> {
+    format_usage_summary(base, context, false)
+}
+
+/// Same shape as `usage_line`, but the trailing field is the wall-clock time
+/// the window resets at rather than how long that still takes.
+pub(super) fn format_usage_reset_line(base: &str, context: &DataContext) -> Option<String> {
+    format_usage_summary(base, context, true)
+}
+
+fn format_usage_summary(base: &str, context: &DataContext, clock: bool) -> Option<String> {
     let mut parts = base.split('.');
     let provider = parts.next()?;
     let window = parts.next()?;
@@ -529,6 +539,15 @@ pub(super) fn format_usage_line(base: &str, context: &DataContext) -> Option<Str
         <= 0.0
     {
         return Some(format!("{percentage}%"));
+    }
+    if clock {
+        let unix = context
+            .get(&format!("{provider}.{window}.reset.unix"))
+            .unwrap_or(0.0);
+        let locale = context.get_string("i18n.locale").unwrap_or("en");
+        if let Some(clock) = format_reset_clock(unix, locale) {
+            return Some(format!("{percentage}% · {clock}"));
+        }
     }
     let seconds = context
         .get(&format!("{provider}.{window}.reset.seconds"))

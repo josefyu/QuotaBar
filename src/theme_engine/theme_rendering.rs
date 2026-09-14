@@ -29,6 +29,10 @@ pub fn format_template(template: &str, context: &DataContext) -> String {
             output.push_str(value);
         } else if format.eq_ignore_ascii_case("usage_line") {
             output.push_str(&format_usage_line(expression, context).unwrap_or_else(|| "--".into()));
+        } else if format.eq_ignore_ascii_case("usage_reset_line") {
+            output.push_str(
+                &format_usage_reset_line(expression, context).unwrap_or_else(|| "--".into()),
+            );
         } else if format.eq_ignore_ascii_case("usage_badge") {
             output
                 .push_str(&format_usage_badge(expression, context).unwrap_or_else(|| "--".into()));
