@@ -164,13 +164,11 @@ The Linux implementation in [`linux/`](linux/) is an independent Linux desktop
 adaptation, maintained in [josefyu/QuotaBar](https://github.com/josefyu/QuotaBar)
 by [josefyu](https://github.com/josefyu).
 
-## Windows — original upstream implementation
+## Windows
 
-The Windows code and documentation below describe the original Claude Code
-Usage Monitor. They are retained for compatibility and attribution; QuotaBar's
-Linux tray app is the actively maintained implementation in this repository.
+The Windows app began as [CodeZeno/Claude-Code-Usage-Monitor](https://github.com/CodeZeno/Claude-Code-Usage-Monitor) and keeps its architecture, dashboard, and Theme Studio. This fork tracks upstream and adds its own tray presentation: each provider icon stacks the 5-hour value over the 7-day one, and the tooltip and taskbar widget give the wall-clock reset time rather than a countdown.
 
-The sections below document the original upstream Windows application. WinGet and release downloads point to [CodeZeno/Claude-Code-Usage-Monitor](https://github.com/CodeZeno/Claude-Code-Usage-Monitor), not this Linux-focused fork.
+Builds are published from this repository's [Releases](https://github.com/josefyu/QuotaBar/releases). The WinGet package `CodeZeno.ClaudeCodeUsageMonitor` remains upstream's and installs their build, not this one.
 
 A lightweight, open-source Windows taskbar widget for monitoring Claude Code usage limits and reset times. It can also display usage for Codex, Google Antigravity, OpenCode Go, and Cursor.
 
@@ -196,13 +194,28 @@ Claude Code credentials can be detected from the CLI, Claude desktop app, or WSL
 
 ## Installation
 
-For the original upstream Windows distribution, install the latest version from CodeZeno's WinGet package:
+Download `claude-code-usage-monitor.exe` from the [latest release](https://github.com/josefyu/QuotaBar/releases/latest) and run it. It is a single portable executable with no installer and no runtime to add; settings, themes, and the usage cache live in `%APPDATA%\ClaudeCodeUsageMonitor`. Enabling startup also adds one `Run` entry under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. To remove it, disable startup from the tray menu, close the app, and delete the file and that folder.
+
+From PowerShell:
+
+```powershell
+$dir = "$env:LOCALAPPDATA\Programs\QuotaBar"
+New-Item -ItemType Directory -Force $dir | Out-Null
+Invoke-WebRequest `
+  "https://github.com/josefyu/QuotaBar/releases/latest/download/claude-code-usage-monitor.exe" `
+  -OutFile "$dir\claude-code-usage-monitor.exe"
+& "$dir\claude-code-usage-monitor.exe"
+```
+
+The release carries a `.sha256` file next to the executable if you want to verify the download. The build is unsigned, so SmartScreen shows a warning on first run — "More info" then "Run anyway" gets past it.
+
+To start it with Windows, enable startup from the tray icon's right-click menu, which registers whatever path you ran it from.
+
+Upstream's WinGet package installs their build rather than this fork's:
 
 ```powershell
 winget install CodeZeno.ClaudeCodeUsageMonitor
 ```
-
-If you prefer not to use WinGet, download the latest upstream `claude-code-usage-monitor.exe` from the [CodeZeno Releases](https://github.com/CodeZeno/Claude-Code-Usage-Monitor/releases) page and run it directly. These Windows release artifacts are not published from this fork.
 
 ## Usage
 
