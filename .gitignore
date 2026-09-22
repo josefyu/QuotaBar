@@ -33,3 +33,8 @@ AGENTS.md
 
 # Local WinGet manifest generation output
 /manifests/
+
+# DeskBand build output and the locally deployed copies it is registered from
+/windows/deskband/target/
+/windows/deskband/target-next/
+/windows/deskband/dist/

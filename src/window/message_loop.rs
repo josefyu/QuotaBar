@@ -155,6 +155,15 @@ pub(super) unsafe extern "system" fn wnd_proc(
         }
         WM_SETCURSOR if set_surface_cursor(hwnd) => LRESULT(1),
         WM_SETCURSOR => DefWindowProcW(hwnd, msg, wparam, lparam),
+        WM_LBUTTONDOWN => {
+            begin_theme_drag(hwnd);
+            LRESULT(0)
+        }
+        WM_CAPTURECHANGED => {
+            cancel_theme_drag();
+            LRESULT(0)
+        }
+        WM_MOUSEMOVE if update_theme_drag() => LRESULT(0),
         WM_MOUSEMOVE => {
             let is_dragging = {
                 let state = lock_state();
@@ -279,6 +288,7 @@ pub(super) unsafe extern "system" fn wnd_proc(
             }
             LRESULT(0)
         }
+        WM_LBUTTONUP if finish_theme_drag() => LRESULT(0),
         WM_LBUTTONUP => {
             let suppressed = {
                 let mut state = lock_state();

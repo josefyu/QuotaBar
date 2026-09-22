@@ -15,7 +15,7 @@ use windows::Win32::UI::Accessibility::HWINEVENTHOOK;
 use windows::Win32::UI::Controls::WM_MOUSELEAVE;
 use windows::Win32::UI::HiDpi::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetDoubleClickTime, ReleaseCapture, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT,
+    GetDoubleClickTime, ReleaseCapture, SetCapture, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT,
 };
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::*;
@@ -112,6 +112,10 @@ struct AppState {
     drag_start_mouse_x: i32,
     drag_start_client_x: i32,
     drag_start_offset: i32,
+    /// Horizontal placement the user dragged a themed surface to, overriding
+    /// the theme's own offset so read-only built-in themes stay movable.
+    theme_offset_x: Option<i32>,
+    theme_drag: Option<ThemeDrag>,
 
     custom_theme_enabled: bool,
     usage_countdown: bool,
@@ -125,6 +129,16 @@ struct AppState {
     hovered_mouse_layer: Option<(usize, String)>,
     pending_mouse_click: Option<PendingMouseClick>,
     suppress_next_left_up: bool,
+}
+
+/// A left-button press on a themed surface that may become a horizontal drag.
+/// The press only turns into a drag once the pointer passes a small threshold,
+/// so ordinary clicks still reach the theme's own mouse actions.
+#[derive(Clone, Debug)]
+struct ThemeDrag {
+    start_mouse_x: i32,
+    start_offset_x: i32,
+    moved: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -547,6 +561,7 @@ fn save_state_settings() {
             .active_theme_path
             .as_ref()
             .map(|path| path.to_string_lossy().to_string());
+        persisted.theme_offset_x = s.theme_offset_x;
         // The dashboard process owns its dimensions, so leave the freshly
         // loaded values unchanged when monitor actions persist settings.
         if let Err(error) = save_settings(&persisted) {
@@ -1848,6 +1863,8 @@ pub fn run() {
                 drag_start_mouse_x: 0,
                 drag_start_client_x: 0,
                 drag_start_offset: 0,
+                theme_offset_x: settings.theme_offset_x,
+                theme_drag: None,
                 custom_theme_enabled,
                 usage_countdown: settings.usage_countdown,
                 active_theme_path,

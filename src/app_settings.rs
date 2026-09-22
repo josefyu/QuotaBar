@@ -62,6 +62,12 @@ pub struct SettingsFile {
     pub usage_countdown: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_theme_path: Option<String>,
+    /// Horizontal position the user dragged the widget to, in theme units.
+    /// It overrides the active theme's own horizontal placement offset, so a
+    /// read-only built-in theme can still be moved along the taskbar. `None`
+    /// leaves the theme's own offset untouched.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme_offset_x: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dashboard_width: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -87,6 +93,7 @@ impl Default for SettingsFile {
             custom_theme_enabled: true,
             usage_countdown: false,
             active_theme_path: None,
+            theme_offset_x: None,
             dashboard_width: None,
             dashboard_height: None,
         }

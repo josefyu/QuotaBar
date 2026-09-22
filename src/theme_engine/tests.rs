@@ -548,7 +548,7 @@ fn built_in_classic_uses_149_geometry() {
     ] {
         assert_eq!(
             resolve_surface_size(&theme, 0, None, runtime),
-            (expected_width, 46)
+            (expected_width, 40)
         );
     }
 }
@@ -755,8 +755,8 @@ fn opencode_monthly_window_is_available_to_templates_when_present() {
 fn starter_theme_renders_transparent_pixels_at_declared_size() {
     let theme = ThemeDocument::starter();
     let rendered = render_theme(&theme, None);
-    assert_eq!((rendered.width, rendered.height), (217, 46));
-    assert_eq!(rendered.pixels.len(), 217 * 46);
+    assert_eq!((rendered.width, rendered.height), (217, 40));
+    assert_eq!(rendered.pixels.len(), 217 * 40);
     assert!(rendered.pixels.iter().any(|pixel| pixel >> 24 > 0));
     assert_eq!(rendered.pixels[0] >> 24, 0);
     let track_alpha = (30..139)
@@ -797,10 +797,10 @@ fn theme_surfaces_rasterize_at_requested_dpi_scales() {
     let theme = ThemeDocument::starter();
     let runtime = ThemeRuntime::new(true, false, false);
     for (scale, width, height) in [
-        (1.0, 217, 46),
-        (1.25, 271, 58),
-        (1.5, 326, 69),
-        (2.0, 434, 92),
+        (1.0, 217, 40),
+        (1.25, 271, 50),
+        (1.5, 326, 60),
+        (2.0, 434, 80),
     ] {
         let rendered = render_theme_surface_with_runtime_at_scale(&theme, 0, None, runtime, scale);
         assert_eq!((rendered.width, rendered.height), (width, height));
@@ -865,7 +865,7 @@ fn invalid_render_scales_fall_back_to_one() {
             ThemeRuntime::default(),
             scale,
         );
-        assert_eq!((rendered.width, rendered.height), (217, 46));
+        assert_eq!((rendered.width, rendered.height), (217, 40));
     }
 }
 
@@ -1118,7 +1118,7 @@ fn starter_adapts_width_segments_and_collapsed_provider_rows() {
             2,
         ),
     ] {
-        assert_eq!(resolve_surface_size(&theme, 0, None, runtime), (width, 46));
+        assert_eq!(resolve_surface_size(&theme, 0, None, runtime), (width, 40));
         let (canvas_width, canvas_height) = resolve_surface_size(&theme, 0, None, runtime);
         let canvas = Canvas {
             width: canvas_width,
@@ -1133,7 +1133,7 @@ fn starter_adapts_width_segments_and_collapsed_provider_rows() {
             segments
         );
         let rendered = render_theme_surface_with_runtime(&theme, 0, None, runtime);
-        assert_eq!((rendered.width, rendered.height), (width, 46));
+        assert_eq!((rendered.width, rendered.height), (width, 40));
         assert!(rendered.warnings.is_empty());
     }
 

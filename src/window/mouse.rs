@@ -43,6 +43,148 @@ pub(super) fn mouse_target_at(hwnd: HWND, lparam: LPARAM) -> Option<(usize, Stri
     Some((surface_index, object_id))
 }
 
+/// Pointer travel that separates a click from a drag, in physical pixels.
+const THEME_DRAG_THRESHOLD: i32 = 4;
+
+/// Remember a left-button press so a sideways pull can move the widget along
+/// the taskbar. Presses that never travel stay ordinary clicks.
+pub(super) fn begin_theme_drag(hwnd: HWND) {
+    // Explorer places a band it reserved space for, so leave that mode alone.
+    if deskband_host_present() {
+        diagnose::log("theme drag skipped: the deskband host owns placement");
+        return;
+    }
+    let mut pt = POINT::default();
+    unsafe {
+        let _ = GetCursorPos(&mut pt);
+    }
+    let started = {
+        let mut state = lock_state();
+        let Some(s) = state.as_mut() else {
+            return;
+        };
+        if !s.custom_theme_enabled || s.hwnd.to_hwnd() != hwnd {
+            diagnose::log("theme drag skipped: not the themed main surface");
+            return;
+        }
+        let Some(theme) = effective_theme_from_state(s) else {
+            diagnose::log("theme drag skipped: no active theme");
+            return;
+        };
+        let nest = theme
+            .placement
+            .nest
+            .resolve(theme.placement.reference.region);
+        if nest != SurfaceNest::Taskbar {
+            diagnose::log(format!("theme drag skipped: surface nests as {nest:?}"));
+            return;
+        }
+        s.theme_drag = Some(ThemeDrag {
+            start_mouse_x: pt.x,
+            start_offset_x: s.theme_offset_x.unwrap_or(theme.placement.offset_x),
+            moved: false,
+        });
+        true
+    };
+    if started {
+        diagnose::log("theme drag armed");
+        unsafe {
+            SetCapture(hwnd);
+        }
+    }
+}
+
+/// Move the widget with the pointer. Returns true while a press is being
+/// tracked, so the caller leaves hover handling alone.
+pub(super) fn update_theme_drag() -> bool {
+    let mut pt = POINT::default();
+    unsafe {
+        let _ = GetCursorPos(&mut pt);
+    }
+    // Resolve the surface size under the lock, then drop it: the drag bounds
+    // query Explorer, which can re-enter our window procedure.
+    let pending = {
+        let state = lock_state();
+        state.as_ref().and_then(|s| {
+            s.theme_drag.as_ref().map(|drag| {
+                let theme = effective_theme_from_state(s).map(|mut theme| {
+                    let runtime =
+                        theme_runtime_for_surface(&theme, 0, theme_runtime_from_state(s));
+                    let (width, height) =
+                        theme_engine::resolve_surface_size(&theme, 0, s.data.as_ref(), runtime);
+                    theme.canvas.width = width;
+                    theme.canvas.height = height;
+                    theme
+                });
+                (drag.start_mouse_x, drag.start_offset_x, drag.moved, theme)
+            })
+        })
+    };
+    let Some((start_mouse_x, start_offset_x, moved, theme)) = pending else {
+        return false;
+    };
+    let delta = pt.x - start_mouse_x;
+    if !moved && delta.abs() < THEME_DRAG_THRESHOLD {
+        return true;
+    }
+    let Some(theme) = theme else {
+        return true;
+    };
+    let scale = theme_surface_scale(&theme, 0);
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    let mut offset = start_offset_x + (delta as f64 / scale).round() as i32;
+    if let Some((min, max)) = taskbar_drag_bounds(&theme, scale) {
+        offset = offset.clamp(min, max);
+    }
+    {
+        let mut state = lock_state();
+        let Some(s) = state.as_mut() else {
+            return true;
+        };
+        match s.theme_drag.as_mut() {
+            Some(drag) => drag.moved = true,
+            None => return false,
+        }
+        if s.theme_offset_x == Some(offset) {
+            return true;
+        }
+        s.theme_offset_x = Some(offset);
+    }
+    position_at_taskbar();
+    true
+}
+
+/// Finish a tracked press. Returns true when it turned into a real drag, so
+/// the release does not also fire the theme's click action.
+pub(super) fn finish_theme_drag() -> bool {
+    let drag = {
+        let mut state = lock_state();
+        state.as_mut().and_then(|s| s.theme_drag.take())
+    };
+    let Some(drag) = drag else {
+        return false;
+    };
+    unsafe {
+        let _ = ReleaseCapture();
+    }
+    if !drag.moved {
+        return false;
+    }
+    save_state_settings();
+    true
+}
+
+pub(super) fn cancel_theme_drag() {
+    let mut state = lock_state();
+    if let Some(s) = state.as_mut() {
+        s.theme_drag = None;
+    }
+}
+
 pub(super) fn mouse_handler_exists(
     surface_index: usize,
     object_id: &str,

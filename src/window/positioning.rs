@@ -12,6 +12,10 @@ pub(super) fn position_at_taskbar() {
                         theme_engine::resolve_surface_size(&theme, 0, s.data.as_ref(), runtime);
                     theme.canvas.width = width;
                     theme.canvas.height = height;
+                    if let Some(offset_x) = s.theme_offset_x {
+                        theme.placement.offset_x = offset_x;
+                        theme.placement.offset_x_expression = None;
+                    }
                     let scale = theme_surface_scale(&theme, 0);
                     (s.hwnd.to_hwnd(), theme, scale)
                 })
@@ -231,6 +235,34 @@ pub(super) fn position_custom_theme_internal(hwnd: HWND, theme: &ThemeDocument, 
     let taskbar = taskbars.iter().find(|taskbar| unsafe {
         MonitorFromWindow(taskbar.hwnd, MONITOR_DEFAULTTOPRIMARY) == display.handle
     });
+    let width = scaled_theme_dimension(theme.canvas.width.max(1), scale);
+    let height = scaled_theme_dimension(theme.canvas.height.max(1), scale);
+    let nest = theme
+        .placement
+        .nest
+        .resolve(theme.placement.reference.region);
+
+    // A registered QuotaBar DeskBand owns real space in Explorer's layout.
+    // When present, place the rendered surface inside that host and disregard
+    // the legacy tray-relative offset used by overlay mode.
+    if nest == SurfaceNest::Taskbar {
+        if let Some(host) = taskbar.and_then(|taskbar| {
+            native_interop::find_descendant_window(taskbar.hwnd, "QuotaBarDeskBandHost")
+        }) {
+            unsafe {
+                native_interop::embed_as_child(hwnd, host);
+                let mut client = RECT::default();
+                let _ = GetClientRect(host, &mut client);
+                let host_height = client.bottom - client.top;
+                let y = (host_height - height) / 2;
+                let _ = SetWindowPos(hwnd, Some(HWND_TOP), 0, y, width, height, SWP_NOACTIVATE);
+            }
+            diagnose::log(format!(
+                "positioned theme in reserved deskband host w={width} h={height}"
+            ));
+            return;
+        }
+    }
     let reference = match theme.placement.reference.region {
         ReferenceRegion::Monitor => display.rect,
         ReferenceRegion::Taskbar => taskbar.map(|taskbar| taskbar.rect).unwrap_or(display.rect),
@@ -242,8 +274,6 @@ pub(super) fn position_custom_theme_internal(hwnd: HWND, theme: &ThemeDocument, 
             })
             .unwrap_or(display.rect),
     };
-    let width = scaled_theme_dimension(theme.canvas.width.max(1), scale);
-    let height = scaled_theme_dimension(theme.canvas.height.max(1), scale);
     let reference_width = reference.right - reference.left;
     let reference_height = reference.bottom - reference.top;
     let surface_horizontal = theme
@@ -270,10 +300,6 @@ pub(super) fn position_custom_theme_internal(hwnd: HWND, theme: &ThemeDocument, 
         vertical_anchor_factor(surface_vertical),
         (theme.placement.offset_y as f64 * scale).round() as i32,
     );
-    let nest = theme
-        .placement
-        .nest
-        .resolve(theme.placement.reference.region);
     unsafe {
         match nest {
             SurfaceNest::Taskbar => {
@@ -488,6 +514,64 @@ pub(super) fn aligned_origin(
         - surface_length as f64 * surface_factor)
         .round() as i32
         + offset
+}
+
+/// True while Explorer hosts the widget in space it reserved for the DeskBand.
+/// The band owns its own position there, so the widget must not move itself.
+pub(super) fn deskband_host_present() -> bool {
+    native_interop::find_taskbars().iter().any(|taskbar| {
+        native_interop::find_descendant_window(taskbar.hwnd, "QuotaBarDeskBandHost").is_some()
+    })
+}
+
+/// The horizontal range a taskbar-nested surface can be dragged into, in theme
+/// units: far enough left to reach the taskbar edge, and no further right than
+/// the notification area it is anchored to.
+pub(super) fn taskbar_drag_bounds(theme: &ThemeDocument, scale: f64) -> Option<(i32, i32)> {
+    let displays = native_interop::find_monitors();
+    let taskbars = native_interop::find_taskbars();
+    let display = displays
+        .get(theme.placement.reference.display)
+        .copied()
+        .or_else(|| displays.first().copied())?;
+    let taskbar = taskbars.iter().find(|taskbar| unsafe {
+        MonitorFromWindow(taskbar.hwnd, MONITOR_DEFAULTTOPRIMARY) == display.handle
+    })?;
+    let tray = native_interop::find_child_window(taskbar.hwnd, "TrayNotifyWnd")
+        .and_then(native_interop::get_window_rect_safe);
+    let reference = match theme.placement.reference.region {
+        ReferenceRegion::Monitor => display.rect,
+        ReferenceRegion::Taskbar => taskbar.rect,
+        ReferenceRegion::SystemTray => tray.unwrap_or(taskbar.rect),
+    };
+    let width = scaled_theme_dimension(theme.canvas.width.max(1), scale);
+    let surface_horizontal = theme
+        .placement
+        .surface_horizontal
+        .unwrap_or(theme.placement.horizontal);
+    // Where the surface sits with no offset at all; the bounds are expressed
+    // as the distance from there to each taskbar edge.
+    let origin = aligned_origin(
+        reference.left,
+        reference.right - reference.left,
+        width,
+        horizontal_anchor_factor(theme.placement.horizontal),
+        horizontal_anchor_factor(surface_horizontal),
+        0,
+    );
+    let right_limit = tray.map(|tray| tray.left).unwrap_or(taskbar.rect.right);
+    let min = physical_to_theme_units(taskbar.rect.left - origin, scale);
+    let max = physical_to_theme_units(right_limit - width - origin, scale);
+    Some((min.min(max), max))
+}
+
+fn physical_to_theme_units(physical: i32, scale: f64) -> i32 {
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    (physical as f64 / scale).round() as i32
 }
 
 pub(super) fn horizontal_anchor_factor(anchor: HorizontalAnchor) -> f64 {

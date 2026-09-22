@@ -20,7 +20,7 @@
         "offset_y": 0
       },
       "width": "42 + providers.count * (ceil(10 / max(1, providers.count)) * 11 - 1 + 4 + 62) + max(0, providers.count - 1) * 3 + (providers.opencode.enabled + providers.cursor.enabled) * 28",
-      "height": "46",
+      "height": "40",
       "mouse_events": {
         "right_click": "show_context_menu(\"classic-v1\")"
       },
@@ -29,9 +29,9 @@
           "id": "divider-dark-left",
           "name": "Dark divider left",
           "render": "system.dark",
-          "y": "10",
+          "y": "8",
           "width": "2",
-          "height": "25",
+          "height": "24",
           "background": {
             "type": "colour",
             "colour": {
@@ -44,9 +44,9 @@
           "name": "Dark divider right",
           "render": "system.dark",
           "x": "2",
-          "y": "10",
+          "y": "8",
           "width": "1",
-          "height": "25",
+          "height": "24",
           "background": {
             "type": "colour",
             "colour": {
@@ -58,9 +58,9 @@
           "id": "divider-light-left",
           "name": "Light divider left",
           "render": "1 - system.dark",
-          "y": "10",
+          "y": "8",
           "width": "2",
-          "height": "25",
+          "height": "24",
           "background": {
             "type": "colour",
             "colour": {
@@ -73,9 +73,9 @@
           "name": "Light divider right",
           "render": "1 - system.dark",
           "x": "2",
-          "y": "10",
+          "y": "8",
           "width": "1",
-          "height": "25",
+          "height": "24",
           "background": {
             "type": "colour",
             "colour": {
@@ -88,7 +88,7 @@
           "name": "dark 5-hour label",
           "render": "system.dark",
           "x": "13",
-          "y": "5",
+          "y": "4",
           "width": "18",
           "height": "13",
           "content": {
@@ -110,7 +110,7 @@
           "name": "dark 7-day label",
           "render": "system.dark * (1 - providers.opencode.enabled)",
           "x": "13",
-          "y": "28",
+          "y": "23",
           "width": "18",
           "height": "13",
           "content": {
@@ -132,7 +132,7 @@
           "name": "light 5-hour label",
           "render": "1 - system.dark",
           "x": "13",
-          "y": "5",
+          "y": "4",
           "width": "18",
           "height": "13",
           "content": {
@@ -154,7 +154,7 @@
           "name": "light 7-day label",
           "render": "(1 - system.dark) * (1 - providers.opencode.enabled)",
           "x": "13",
-          "y": "28",
+          "y": "23",
           "width": "18",
           "height": "13",
           "content": {
@@ -177,14 +177,14 @@
           "render": "providers.cursor.enabled",
           "parent": "provider-row",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4 + 90",
-          "height": "46"
+          "height": "40"
         },
         {
           "id": "cursor-session-segments-dark",
           "name": "dark Cursor Auto segments",
           "render": "system.dark",
           "parent": "cursor-provider",
-          "y": "5",
+          "y": "4",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -209,7 +209,7 @@
           "render": "system.dark",
           "parent": "cursor-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "5",
+          "y": "4",
           "width": "90",
           "height": "13",
           "content": {
@@ -231,7 +231,7 @@
           "name": "light Cursor Auto segments",
           "render": "1 - system.dark",
           "parent": "cursor-provider",
-          "y": "5",
+          "y": "4",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -256,7 +256,7 @@
           "render": "1 - system.dark",
           "parent": "cursor-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "5",
+          "y": "4",
           "width": "90",
           "height": "13",
           "content": {
@@ -278,7 +278,7 @@
           "name": "dark Cursor API segments",
           "render": "system.dark",
           "parent": "cursor-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -303,7 +303,7 @@
           "render": "system.dark",
           "parent": "cursor-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "90",
           "height": "13",
           "content": {
@@ -325,7 +325,7 @@
           "name": "light Cursor API segments",
           "render": "1 - system.dark",
           "parent": "cursor-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -350,7 +350,7 @@
           "render": "1 - system.dark",
           "parent": "cursor-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "90",
           "height": "13",
           "content": {
@@ -372,7 +372,7 @@
           "name": "dark OpenCode 7-day or 30-day label",
           "render": "system.dark * providers.opencode.enabled",
           "x": "8",
-          "y": "28",
+          "y": "23",
           "width": "30",
           "height": "13",
           "content": {
@@ -394,7 +394,7 @@
           "name": "light OpenCode 7-day or 30-day label",
           "render": "(1 - system.dark) * providers.opencode.enabled",
           "x": "8",
-          "y": "28",
+          "y": "23",
           "width": "30",
           "height": "13",
           "content": {
@@ -416,7 +416,7 @@
           "name": "Enabled providers",
           "x": "41",
           "width": "canvas.width - 42",
-          "height": "46",
+          "height": "40",
           "layout": "row",
           "gap": "3"
         },
@@ -426,14 +426,14 @@
           "render": "providers.claude.enabled",
           "parent": "provider-row",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4 + 62",
-          "height": "46"
+          "height": "40"
         },
         {
           "id": "claude-session-segments-dark",
           "name": "dark Claude Code 5-hour segments",
           "render": "system.dark",
           "parent": "claude-provider",
-          "y": "5",
+          "y": "4",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -458,7 +458,7 @@
           "render": "system.dark",
           "parent": "claude-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "5",
+          "y": "4",
           "width": "62",
           "height": "13",
           "content": {
@@ -480,7 +480,7 @@
           "name": "light Claude Code 5-hour segments",
           "render": "1 - system.dark",
           "parent": "claude-provider",
-          "y": "5",
+          "y": "4",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -505,7 +505,7 @@
           "render": "1 - system.dark",
           "parent": "claude-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "5",
+          "y": "4",
           "width": "62",
           "height": "13",
           "content": {
@@ -527,7 +527,7 @@
           "name": "dark Claude Code 7-day segments",
           "render": "system.dark",
           "parent": "claude-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -552,7 +552,7 @@
           "render": "(system.dark) && !claude.credits.available",
           "parent": "claude-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "62",
           "height": "13",
           "content": {
@@ -574,7 +574,7 @@
           "name": "light Claude Code 7-day segments",
           "render": "1 - system.dark",
           "parent": "claude-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -599,7 +599,7 @@
           "render": "(1 - system.dark) && !claude.credits.available",
           "parent": "claude-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "62",
           "height": "13",
           "content": {
@@ -622,14 +622,14 @@
           "render": "providers.codex.enabled",
           "parent": "provider-row",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4 + 62",
-          "height": "46"
+          "height": "40"
         },
         {
           "id": "codex-session-segments-dark",
           "name": "dark Codex 5-hour segments",
           "render": "system.dark",
           "parent": "codex-provider",
-          "y": "5",
+          "y": "4",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -654,7 +654,7 @@
           "render": "system.dark",
           "parent": "codex-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "5",
+          "y": "4",
           "width": "62",
           "height": "13",
           "content": {
@@ -676,7 +676,7 @@
           "name": "light Codex 5-hour segments",
           "render": "1 - system.dark",
           "parent": "codex-provider",
-          "y": "5",
+          "y": "4",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -701,7 +701,7 @@
           "render": "1 - system.dark",
           "parent": "codex-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "5",
+          "y": "4",
           "width": "62",
           "height": "13",
           "content": {
@@ -723,7 +723,7 @@
           "name": "dark Codex 7-day segments",
           "render": "system.dark",
           "parent": "codex-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -748,7 +748,7 @@
           "render": "(system.dark) && !codex.credits.available",
           "parent": "codex-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "62",
           "height": "13",
           "content": {
@@ -770,7 +770,7 @@
           "name": "light Codex 7-day segments",
           "render": "1 - system.dark",
           "parent": "codex-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -795,7 +795,7 @@
           "render": "(1 - system.dark) && !codex.credits.available",
           "parent": "codex-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "62",
           "height": "13",
           "content": {
@@ -818,14 +818,14 @@
           "render": "providers.antigravity.enabled",
           "parent": "provider-row",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4 + 62",
-          "height": "46"
+          "height": "40"
         },
         {
           "id": "antigravity-session-segments-dark",
           "name": "dark Antigravity 5-hour segments",
           "render": "system.dark",
           "parent": "antigravity-provider",
-          "y": "5",
+          "y": "4",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -850,7 +850,7 @@
           "render": "system.dark",
           "parent": "antigravity-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "5",
+          "y": "4",
           "width": "62",
           "height": "13",
           "content": {
@@ -872,7 +872,7 @@
           "name": "light Antigravity 5-hour segments",
           "render": "1 - system.dark",
           "parent": "antigravity-provider",
-          "y": "5",
+          "y": "4",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -897,7 +897,7 @@
           "render": "1 - system.dark",
           "parent": "antigravity-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "5",
+          "y": "4",
           "width": "62",
           "height": "13",
           "content": {
@@ -919,7 +919,7 @@
           "name": "dark Antigravity 7-day segments",
           "render": "system.dark",
           "parent": "antigravity-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -944,7 +944,7 @@
           "render": "system.dark",
           "parent": "antigravity-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "62",
           "height": "13",
           "content": {
@@ -966,7 +966,7 @@
           "name": "light Antigravity 7-day segments",
           "render": "1 - system.dark",
           "parent": "antigravity-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -991,7 +991,7 @@
           "render": "1 - system.dark",
           "parent": "antigravity-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "62",
           "height": "13",
           "content": {
@@ -1014,14 +1014,14 @@
           "render": "providers.opencode.enabled",
           "parent": "provider-row",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4 + 90",
-          "height": "46"
+          "height": "40"
         },
         {
           "id": "opencode-session-segments-dark",
           "name": "dark OpenCode 5-hour segments",
           "render": "system.dark",
           "parent": "opencode-provider",
-          "y": "5",
+          "y": "4",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -1046,7 +1046,7 @@
           "render": "system.dark",
           "parent": "opencode-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "5",
+          "y": "4",
           "width": "62",
           "height": "13",
           "content": {
@@ -1068,7 +1068,7 @@
           "name": "light OpenCode 5-hour segments",
           "render": "1 - system.dark",
           "parent": "opencode-provider",
-          "y": "5",
+          "y": "4",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -1093,7 +1093,7 @@
           "render": "1 - system.dark",
           "parent": "opencode-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "5",
+          "y": "4",
           "width": "62",
           "height": "13",
           "content": {
@@ -1115,7 +1115,7 @@
           "name": "dark OpenCode long-window segments",
           "render": "system.dark",
           "parent": "opencode-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -1140,7 +1140,7 @@
           "render": "system.dark",
           "parent": "opencode-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "90",
           "height": "13",
           "content": {
@@ -1162,7 +1162,7 @@
           "name": "light OpenCode long-window segments",
           "render": "1 - system.dark",
           "parent": "opencode-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -1187,7 +1187,7 @@
           "render": "1 - system.dark",
           "parent": "opencode-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "90",
           "height": "13",
           "content": {
@@ -1209,7 +1209,7 @@
           "name": "dark claude credit overlay",
           "render": "(system.dark) && claude.credits.available",
           "parent": "claude-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -1236,7 +1236,7 @@
           "render": "(system.dark) && claude.credits.available",
           "parent": "claude-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "62",
           "height": "13",
           "content": {
@@ -1259,7 +1259,7 @@
           "name": "light claude credit overlay",
           "render": "(1 - system.dark) && claude.credits.available",
           "parent": "claude-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -1286,7 +1286,7 @@
           "render": "(1 - system.dark) && claude.credits.available",
           "parent": "claude-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "62",
           "height": "13",
           "content": {
@@ -1309,7 +1309,7 @@
           "name": "dark codex credit overlay",
           "render": "(system.dark) && codex.credits.available",
           "parent": "codex-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -1336,7 +1336,7 @@
           "render": "(system.dark) && codex.credits.available",
           "parent": "codex-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "62",
           "height": "13",
           "content": {
@@ -1359,7 +1359,7 @@
           "name": "light codex credit overlay",
           "render": "(1 - system.dark) && codex.credits.available",
           "parent": "codex-provider",
-          "y": "28",
+          "y": "23",
           "width": "ceil(10 / max(1, providers.count)) * 11 - 1",
           "height": "13",
           "content": {
@@ -1386,7 +1386,7 @@
           "render": "(1 - system.dark) && codex.credits.available",
           "parent": "codex-provider",
           "x": "ceil(10 / max(1, providers.count)) * 11 - 1 + 4",
-          "y": "28",
+          "y": "23",
           "width": "62",
           "height": "13",
           "content": {

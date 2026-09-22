@@ -142,6 +142,36 @@ pub fn find_child_window(parent: HWND, class_name: &str) -> Option<HWND> {
     }
 }
 
+/// Find a descendant window by class name, not just a direct child.
+pub fn find_descendant_window(parent: HWND, class_name: &str) -> Option<HWND> {
+    struct Search<'a> {
+        class_name: &'a str,
+        found: Option<HWND>,
+    }
+
+    unsafe extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let search = unsafe { &mut *(lparam.0 as *mut Search<'_>) };
+        if window_class_name(hwnd).as_deref() == Some(search.class_name) {
+            search.found = Some(hwnd);
+            return BOOL(0);
+        }
+        BOOL(1)
+    }
+
+    let mut search = Search {
+        class_name,
+        found: None,
+    };
+    unsafe {
+        let _ = EnumChildWindows(
+            Some(parent),
+            Some(enum_proc),
+            LPARAM(&mut search as *mut _ as isize),
+        );
+    }
+    search.found
+}
+
 /// Get taskbar position safely.
 /// We use get_window_rect_safe directly because GetWindowRect is a non-blocking
 /// kernel-mode query that returns immediately even if explorer.exe is hung or unresponsive.
