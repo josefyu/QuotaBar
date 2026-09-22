@@ -248,32 +248,6 @@ pub(super) fn position_custom_theme_internal(hwnd: HWND, theme: &ThemeDocument, 
     });
     let width = scaled_theme_dimension(theme.canvas.width.max(1), scale);
     let height = scaled_theme_dimension(theme.canvas.height.max(1), scale);
-    let nest = theme
-        .placement
-        .nest
-        .resolve(theme.placement.reference.region);
-
-    // A registered QuotaBar DeskBand owns real space in Explorer's layout.
-    // When present, place the rendered surface inside that host and disregard
-    // the tray-relative placement used by overlay mode.
-    if nest == SurfaceNest::Taskbar {
-        if let Some(host) = taskbar.and_then(|taskbar| {
-            native_interop::find_descendant_window(taskbar.hwnd, "QuotaBarDeskBandHost")
-        }) {
-            unsafe {
-                native_interop::embed_as_child(hwnd, host);
-                let mut client = RECT::default();
-                let _ = GetClientRect(host, &mut client);
-                let host_height = client.bottom - client.top;
-                let y = (host_height - height) / 2;
-                let _ = SetWindowPos(hwnd, Some(HWND_TOP), 0, y, width, height, SWP_NOACTIVATE);
-            }
-            diagnose::log(format!(
-                "positioned theme in reserved deskband host w={width} h={height}"
-            ));
-            return;
-        }
-    }
     let tray = taskbar
         .and_then(|tb| native_interop::find_child_window(tb.hwnd, "TrayNotifyWnd"))
         .and_then(native_interop::get_window_rect_safe);
@@ -287,6 +261,10 @@ pub(super) fn position_custom_theme_internal(hwnd: HWND, theme: &ThemeDocument, 
         tray,
     );
     let (x, y) = (rect.left, rect.top);
+    let nest = theme
+        .placement
+        .nest
+        .resolve(theme.placement.reference.region);
     unsafe {
         match nest {
             SurfaceNest::Taskbar => {
