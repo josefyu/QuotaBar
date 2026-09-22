@@ -51,11 +51,11 @@ impl StudioApp {
         owner: isize,
         initial_page: Page,
     ) -> Self {
+        crate::diagnose::log_lazy(|| format!("dashboard started owner={owner}"));
         let settings = app_settings::load_settings();
         let language = localization::resolve_language(
             settings.language.as_deref().and_then(LanguageId::from_code),
         );
-        egui_extras::install_image_loaders(&context.egui_ctx);
         configure_style(&context.egui_ctx, language);
         style_native_titlebar(context);
         let classic_theme_path = theme_engine::ensure_starter_theme().ok();
@@ -81,9 +81,22 @@ impl StudioApp {
             .as_deref()
             .and_then(|path| context_menu::load_context_menu(path).ok())
             .unwrap_or_else(context_menu::classic_context_menu);
-        let usage_cache = app_settings::load_usage_cache();
-        let usage_poll_ok = usage_cache.as_ref().is_some_and(|cache| cache.poll_ok);
-        let usage_has_error = usage_cache.as_ref().is_some_and(|cache| !cache.poll_ok);
+        let usage_cache = app_settings::load_usage_cache().map(|mut cache| {
+            cache.data.select_accounts(&settings.accounts);
+            cache
+        });
+        let usage_poll_ok = usage_cache
+            .as_ref()
+            .is_some_and(|cache| cache.poll_ok && !cache.data.is_empty());
+        let usage_has_error = usage_cache.as_ref().is_some_and(|cache| {
+            !cache.poll_ok
+                || (cache.data.is_empty()
+                    && cache
+                        .data
+                        .accounts
+                        .iter()
+                        .any(|account| account.error.is_some()))
+        });
         let usage = usage_cache.map(|cache| cache.data);
         let next_preview_countdown_refresh = preview_countdown_refresh_delay(usage.as_ref())
             .and_then(|delay| Instant::now().checked_add(delay));
@@ -92,7 +105,11 @@ impl StudioApp {
             .and_then(|interval| Instant::now().checked_add(clock_refresh_delay(interval)));
         Self {
             owner,
+            update_status: crate::dashboard::read_update_status(owner),
+            diagnostics: studio_diagnostics::DiagnosticsView::new(),
             page: initial_page,
+            synced_poll_interval_ms: settings.poll_interval_ms,
+            poll_interval_editor_generation: 0,
             settings,
             startup_enabled: crate::window::is_startup_enabled(),
             theme,
@@ -159,22 +176,40 @@ impl StudioApp {
         }
     }
 
-    pub(super) fn post_owner(&self, message: u32) {
-        if self.owner != 0 {
-            unsafe {
-                let _ = PostMessageW(
-                    Some(HWND(self.owner as *mut _)),
-                    message,
-                    WPARAM(0),
-                    LPARAM(0),
-                );
+    pub(super) fn request_refresh(&mut self) {
+        crate::diagnose::log("Refresh now clicked in dashboard");
+        match studio_diagnostics::send_owner_message(self.owner, WM_APP_REFRESH_NOW) {
+            Ok(()) => {
+                crate::diagnose::log("refresh request delivered to monitor message queue");
+                self.settings_error = None;
+            }
+            Err(error) => {
+                crate::diagnose::log(&error);
+                self.settings_error = Some(error);
             }
         }
     }
 
+    pub(super) fn sync_poll_interval(&mut self, persisted_interval: u32) {
+        // A local frequency edit wins; other dashboard edits must preserve a
+        // newer interval selected from the widget's context menu.
+        if self.settings.poll_interval_ms == self.synced_poll_interval_ms
+            && self.settings.poll_interval_ms != persisted_interval
+        {
+            self.settings.poll_interval_ms = persisted_interval;
+            // Drop the numeric control's old text buffer so losing focus cannot
+            // commit the previous custom value over the menu selection.
+            self.poll_interval_editor_generation =
+                self.poll_interval_editor_generation.wrapping_add(1);
+        }
+        self.synced_poll_interval_ms = persisted_interval;
+    }
+
     pub(super) fn save_settings(&mut self) {
+        self.sync_poll_interval(app_settings::load_settings().poll_interval_ms);
         match app_settings::save_settings(&self.settings) {
             Ok(()) => {
+                self.synced_poll_interval_ms = self.settings.poll_interval_ms;
                 self.settings_error = None;
                 self.notify_owner();
             }
@@ -506,6 +541,7 @@ impl StudioApp {
         context: &egui::Context,
     ) {
         match action {
+            PendingUnsavedAction::Update { install } => self.send_update_action(install),
             PendingUnsavedAction::Close => {
                 context.send_viewport_cmd(egui::ViewportCommand::Close);
             }
@@ -746,13 +782,27 @@ impl StudioApp {
         }
     }
 
-    pub(super) fn update_usage_cache(&mut self, cache: UsageCache) -> bool {
-        let poll_ok = cache.poll_ok;
-        let has_error = !poll_ok;
+    pub(super) fn update_usage_cache(&mut self, mut cache: UsageCache) -> bool {
+        cache.data.select_accounts(&self.settings.accounts);
+        let poll_ok = cache.poll_ok && !cache.data.is_empty();
+        let has_error = !cache.poll_ok
+            || (cache.data.is_empty()
+                && cache
+                    .data
+                    .accounts
+                    .iter()
+                    .any(|account| account.error.is_some()));
         let changed = self.usage.as_ref() != Some(&cache.data)
             || self.usage_poll_ok != poll_ok
             || self.usage_has_error != has_error;
         if changed {
+            crate::diagnose::log_lazy(|| {
+                format!(
+                    "dashboard loaded usage cache: updated={} accounts={} poll_ok={poll_ok}",
+                    cache.updated_unix,
+                    cache.data.accounts.len()
+                )
+            });
             self.usage = Some(cache.data);
             self.usage_poll_ok = poll_ok;
             self.usage_has_error = has_error;
@@ -766,6 +816,8 @@ impl StudioApp {
         }
         let now = Instant::now();
         self.last_cache_read = now;
+        self.update_status = crate::dashboard::read_update_status(self.owner);
+        self.sync_poll_interval(app_settings::load_settings().poll_interval_ms);
         let usage_changed =
             app_settings::load_usage_cache().is_some_and(|cache| self.update_usage_cache(cache));
         let countdown_due = self
@@ -791,6 +843,131 @@ impl StudioApp {
         }
     }
 
+    pub(super) fn request_update_action(&mut self) {
+        if self.update_status.is_busy() || self.pending_unsaved_action.is_some() {
+            return;
+        }
+        let install = matches!(
+            self.update_status,
+            crate::dashboard::UpdateStatus::Available(_)
+        );
+        // The usual check can offer to install immediately. Resolve unsaved
+        // edits first so they cannot keep the dashboard executable locked.
+        if self.dirty {
+            self.pending_unsaved_action = Some(PendingUnsavedAction::Update { install });
+        } else {
+            self.send_update_action(install);
+        }
+    }
+
+    fn send_update_action(&mut self, install: bool) {
+        // A refresh click must still check and prompt even if an automatic
+        // check has found a release since the dashboard last read the status.
+        let message = if install {
+            native_interop::WM_APP_UPDATE_ACTION
+        } else {
+            native_interop::WM_APP_CHECK_FOR_UPDATES
+        };
+        match studio_diagnostics::send_owner_message(self.owner, message) {
+            Ok(()) => {
+                self.update_status = if install {
+                    crate::dashboard::UpdateStatus::Applying
+                } else {
+                    crate::dashboard::UpdateStatus::Checking
+                };
+                self.last_cache_read = Instant::now();
+            }
+            Err(error) => self.theme_error = Some(error),
+        }
+    }
+
+    pub(super) fn version_button(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        use crate::dashboard::UpdateStatus;
+        let language = self.language();
+        let (icon, tooltip) = match &self.update_status {
+            UpdateStatus::Available(version) => (
+                LucideIcon::Download,
+                language
+                    .text("Click to update to v{version}")
+                    .replace("{version}", version),
+            ),
+            UpdateStatus::Checking => (
+                LucideIcon::RefreshCw,
+                language.strings().checking_for_updates.to_string(),
+            ),
+            UpdateStatus::Applying => (
+                LucideIcon::Download,
+                language.strings().applying_update.to_string(),
+            ),
+            UpdateStatus::Idle => (
+                LucideIcon::RefreshCw,
+                language.text("Check for updates").to_string(),
+            ),
+        };
+        let response = ui
+            .scope(|ui| {
+                ui.add_enabled_ui(!self.update_status.is_busy(), |ui| {
+                    let icon_id = ui.id().with("version-update-icon");
+                    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+                    let background = ui.painter().add(egui::Shape::Noop);
+                    let button = egui::AtomLayout::new((
+                        egui::RichText::new(&version).size(16.0).color(muted()),
+                        egui::Atom::custom(icon_id, egui::vec2(12.0, 12.0)),
+                    ))
+                    .gap(4.0)
+                    // The footer row is bottom-aligned; centre the contents
+                    // independently so its extra height is not all above them.
+                    .align2(egui::Align2::LEFT_CENTER)
+                    .sense(egui::Sense::click())
+                    .min_size(egui::vec2(0.0, CONTROL_HEIGHT))
+                    .frame(egui::Frame::new().inner_margin(egui::Margin {
+                        left: 5,
+                        right: 5,
+                        top: 2,
+                        bottom: 4,
+                    }))
+                    .show(ui);
+                    if button.response.hovered() || button.response.has_focus() {
+                        ui.painter().set(
+                            background,
+                            egui::Shape::rect_filled(
+                                button.response.rect,
+                                4.0,
+                                crate::ui::theme::menu_hover(),
+                            ),
+                        );
+                    }
+                    button.response.widget_info(|| {
+                        egui::WidgetInfo::labeled(
+                            egui::WidgetType::Button,
+                            ui.is_enabled(),
+                            &version,
+                        )
+                    });
+                    if let Some(rect) = button.rect(icon_id) {
+                        crate::ui::components::icon::paint_centered_icon(
+                            ui,
+                            rect.translate(egui::vec2(0.0, 1.0)),
+                            icon,
+                            12.0,
+                            muted(),
+                        );
+                    }
+                    button.response
+                })
+                .inner
+            })
+            .inner;
+        let response = response
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
+            .on_hover_text(&tooltip)
+            .on_disabled_hover_text(&tooltip);
+        if response.clicked() {
+            self.request_update_action();
+        }
+        response
+    }
+
     pub(super) fn shell(&mut self, ui: &mut egui::Ui) {
         const GITHUB_URL: &str = "https://github.com/CodeZeno/Claude-Code-Usage-Monitor";
 
@@ -809,7 +986,7 @@ impl StudioApp {
                             left: 8,
                             right: 8,
                             top: 20,
-                            bottom: 0,
+                            bottom: 4,
                         })
                         .show(ui, |ui| {
                             ui.set_width(DEFAULT_MENU_WIDTH - 16.0);
@@ -832,11 +1009,36 @@ impl StudioApp {
                                 language.text("Context Menus"),
                             );
                             nav(ui, &mut self.page, Page::Assets, language.text("Assets"));
+                            ui.separator();
+                            nav(
+                                ui,
+                                &mut self.page,
+                                Page::Diagnostics,
+                                language.text("Diagnostics"),
+                            );
                             ui.allocate_ui_with_layout(
                                 ui.available_size(),
                                 egui::Layout::bottom_up(egui::Align::Min),
                                 |ui| {
-                                    crate::ui::components::navigation::github_link(ui, GITHUB_URL);
+                                    ui.allocate_ui_with_layout(
+                                        egui::vec2(
+                                            ui.available_width(),
+                                            crate::ui::components::navigation::ITEM_HEIGHT,
+                                        ),
+                                        egui::Layout::left_to_right(egui::Align::Max),
+                                        |ui| {
+                                            ui.spacing_mut().item_spacing.x = 4.0;
+                                            crate::ui::components::navigation::github_link(
+                                                ui, GITHUB_URL,
+                                            );
+                                            ui.with_layout(
+                                                egui::Layout::right_to_left(egui::Align::Max),
+                                                |ui| {
+                                                    self.version_button(ui);
+                                                },
+                                            );
+                                        },
+                                    );
                                 },
                             );
                         });
@@ -877,6 +1079,7 @@ impl StudioApp {
                         Page::Studio => self.studio_page(ui),
                         Page::ContextMenus => self.context_menus_page(ui),
                         Page::Assets => self.assets_page(ui),
+                        Page::Diagnostics => self.diagnostics_page(ui),
                     }
                 },
             );

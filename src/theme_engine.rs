@@ -20,12 +20,19 @@ use crate::providers::{ProviderId, ProviderSet, PROVIDER_DESCRIPTORS};
 
 pub const THEME_SCHEMA_VERSION: u32 = 1;
 pub const CLASSIC_THEME_ID: &str = "classic-usage-widget";
+pub const COMPACT_FLUENT_QUAD_THEME_ID: &str = "compact-fluent-quad";
 pub const MINECRAFT_THEME_ID: &str = "theme-minecraft";
 
-const BUILTIN_THEME_SOURCES: &[(&str, &str)] = &[(
-    CLASSIC_THEME_ID,
-    include_str!("themes/classic-usage-widget.json"),
-)];
+const BUILTIN_THEME_SOURCES: &[(&str, &str)] = &[
+    (
+        CLASSIC_THEME_ID,
+        include_str!("themes/classic-usage-widget.json"),
+    ),
+    (
+        COMPACT_FLUENT_QUAD_THEME_ID,
+        include_str!("themes/compact-fluent-quad.json"),
+    ),
+];
 
 /// Bundled starting points are copied into the managed library only when they
 /// are missing. Their ids are deliberately excluded from `is_builtin_theme_id`
@@ -152,6 +159,9 @@ pub struct Canvas {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Placement {
+    /// Runtime-only layout host retained during undocking; never edits the theme.
+    #[serde(skip)]
+    pub host_dimensions: Option<(u32, u32)>,
     #[serde(default)]
     pub reference: ReferenceTarget,
     /// Controls which native shell host owns a root surface. Older themes did
@@ -1202,6 +1212,8 @@ pub struct ThemeRuntime {
     /// the `.display` values and summaries using them follow this; `.percentage`
     /// always means consumption so severity thresholds keep their meaning.
     pub countdown: bool,
+    pub surface_nest: SurfaceNest,
+    pub floating_card_opacity: u8,
     host_width: u32,
     host_height: u32,
 }
@@ -1214,6 +1226,8 @@ impl Default for ThemeRuntime {
             has_error: false,
             language: LanguageId::English,
             countdown: false,
+            surface_nest: SurfaceNest::Taskbar,
+            floating_card_opacity: 85,
             host_width: default_canvas_width(),
             host_height: default_canvas_height(),
         }
@@ -1242,9 +1256,21 @@ impl ThemeRuntime {
             has_error: false,
             language: LanguageId::English,
             countdown: false,
+            surface_nest: SurfaceNest::Taskbar,
+            floating_card_opacity: 85,
             host_width: default_canvas_width(),
             host_height: default_canvas_height(),
         }
+    }
+
+    pub fn with_nest(mut self, nest: SurfaceNest) -> Self {
+        self.surface_nest = nest;
+        self
+    }
+
+    pub fn with_floating_card_opacity(mut self, opacity: u8) -> Self {
+        self.floating_card_opacity = opacity;
+        self
     }
 
     pub fn with_poll_state(mut self, poll_ok: bool, has_error: bool) -> Self {
@@ -1270,6 +1296,10 @@ impl ThemeRuntime {
         self.host_width = width.max(1);
         self.host_height = height.max(1);
         self
+    }
+
+    pub fn host_dimensions(self) -> (u32, u32) {
+        (self.host_width, self.host_height)
     }
 
     pub fn provider_count(self) -> usize {
@@ -1350,6 +1380,7 @@ impl DataContext {
             }
         }
         for descriptor in PROVIDER_DESCRIPTORS {
+            context.insert_string(&format!("{}.account.name", descriptor.key), "");
             context.insert(
                 &format!("providers.{}.enabled", descriptor.key),
                 runtime.provider_enabled(descriptor.id) as u8 as f64,
@@ -1357,7 +1388,40 @@ impl DataContext {
         }
         context.insert("display.countdown", runtime.countdown as u8 as f64);
         if let Some(data) = data {
+            for account in &data.accounts {
+                let key = format!(
+                    "accounts.{}.{}",
+                    account.provider.descriptor().key,
+                    account.profile.id
+                );
+                context.insert_string(&format!("{key}.name"), &account.profile.name);
+                context.insert(&format!("{key}.selected"), account.selected as u8 as f64);
+                context.insert(
+                    &format!("{key}.has_error"),
+                    account.error.is_some() as u8 as f64,
+                );
+                context.insert_provider(
+                    &key,
+                    account.usage.as_ref(),
+                    account.provider == ProviderId::Codex,
+                    runtime.countdown,
+                );
+            }
             for descriptor in PROVIDER_DESCRIPTORS {
+                if let Some(account) = data
+                    .accounts
+                    .iter()
+                    .find(|account| account.provider == descriptor.id && account.selected)
+                {
+                    context.insert(
+                        &format!("{}.has_error", descriptor.key),
+                        account.error.is_some() as u8 as f64,
+                    );
+                }
+                context.insert_string(
+                    &format!("{}.account.name", descriptor.key),
+                    data.selected_account_name(descriptor.id).unwrap_or(""),
+                );
                 context.insert_provider(
                     descriptor.key,
                     data.get(descriptor.id),
@@ -1398,6 +1462,7 @@ impl DataContext {
         // What a gauge or a badge should show. `percentage` stays the share
         // that has been spent so warning thresholds keep working, while
         // `display` follows the countdown setting.
+        self.insert_limits(name, usage, countdown);
         let display = |percentage: f64| {
             if countdown {
                 100.0 - percentage
@@ -1558,7 +1623,24 @@ impl DataContext {
     }
 
     pub fn get(&self, name: &str) -> Option<f64> {
-        self.values.get(&name.to_ascii_lowercase()).copied()
+        let name = name.to_ascii_lowercase();
+        self.values
+            .get(&name)
+            .copied()
+            .or_else(|| self.limit_default(&name))
+            .or_else(|| {
+                let key = Self::account_default_key(&name)?;
+                let value = *Self::account_defaults().values.get(&key)?;
+                Some(
+                    if key.ends_with(".display")
+                        && self.values.get("display.countdown").copied().unwrap_or(0.0) != 0.0
+                    {
+                        100.0 - value
+                    } else {
+                        value
+                    },
+                )
+            })
     }
 
     pub fn insert_string(&mut self, name: &str, value: impl Into<String>) {
@@ -1566,9 +1648,44 @@ impl DataContext {
     }
 
     pub fn get_string(&self, name: &str) -> Option<&str> {
+        let name = name.to_ascii_lowercase();
         self.strings
-            .get(&name.to_ascii_lowercase())
+            .get(&name)
             .map(String::as_str)
+            .or_else(|| Self::limit_string_default(&name))
+            .or_else(|| {
+                let key = Self::account_default_key(&name)?;
+                Self::account_defaults()
+                    .strings
+                    .get(&key)
+                    .map(String::as_str)
+            })
+    }
+
+    // Account IDs are dynamic, but their fields use the same schema as provider
+    // bindings. Supply typed defaults during validation, startup and removal;
+    // unknown fields must still report typos instead of silently becoming zero.
+    fn account_default_key(name: &str) -> Option<String> {
+        let (provider, rest) = name.strip_prefix("accounts.")?.split_once('.')?;
+        let (id, field) = rest.split_once('.')?;
+        (matches!(provider, "claude" | "codex")
+            && !id.is_empty()
+            && id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_'))
+        .then(|| format!("account.{field}"))
+    }
+
+    fn account_defaults() -> &'static Self {
+        static DEFAULTS: OnceLock<DataContext> = OnceLock::new();
+        DEFAULTS.get_or_init(|| {
+            let mut context = Self::default();
+            context.insert_provider("account", None, false, false);
+            context.insert_string("account.name", "");
+            context.insert("account.selected", 0.0);
+            context.insert("account.has_error", 0.0);
+            context
+        })
     }
 
     pub fn with_object(mut self, object: &ResolvedObject<'_>) -> Self {
@@ -1800,7 +1917,7 @@ fn mouse_action_object_context(
         .surfaces
         .get(surface_index)
         .ok_or_else(|| format!("Surface {surface_index} does not exist"))?;
-    let (width, height) = resolve_surface_size(theme, surface_index, data, runtime);
+    let (width, height) = resolve_surface_content_size(theme, surface_index, data, runtime);
     let canvas = Canvas {
         width,
         width_expression: Some(surface.width.clone()),
@@ -1958,7 +2075,7 @@ pub fn execute_mouse_actions(
                 let surface = &effective.surfaces[target_surface_index];
                 let object_id = object.id.clone();
                 let (width, height) =
-                    resolve_surface_size(&effective, target_surface_index, data, runtime);
+                    resolve_surface_content_size(&effective, target_surface_index, data, runtime);
                 let canvas = Canvas {
                     width,
                     width_expression: Some(surface.width.clone()),
@@ -2491,6 +2608,7 @@ impl Default for Canvas {
 impl Default for Placement {
     fn default() -> Self {
         Self {
+            host_dimensions: None,
             reference: ReferenceTarget::default(),
             nest: SurfaceNest::Taskbar,
             horizontal: HorizontalAnchor::Left,
@@ -2542,6 +2660,7 @@ pub use theme_expression::*;
 
 mod theme_datetime;
 pub(crate) use theme_datetime::format_reset_clock;
+mod theme_limits;
 use theme_datetime::*;
 fn schema_version() -> u32 {
     THEME_SCHEMA_VERSION

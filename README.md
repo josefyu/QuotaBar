@@ -172,6 +172,9 @@ Builds are published from this repository's [Releases](https://github.com/josefy
 
 A lightweight, open-source Windows taskbar widget for monitoring Claude Code usage limits and reset times. It can also display usage for Codex, Google Antigravity, OpenCode Go, and Cursor.
 
+See the [user guide](USER_GUIDE.md) for theme customisation and everyday settings,
+or the [changelog](CHANGELOG.md) for version history and notable changes.
+
 ![Claude Code Usage Monitor running in the Windows taskbar](.github/animation.gif)
 
 ## Features
@@ -179,6 +182,7 @@ A lightweight, open-source Windows taskbar widget for monitoring Claude Code usa
 - Displays current usage and time remaining until each limit resets
 - Counts usage up from zero or down from the full allowance, whichever you prefer
 - Supports Claude Code, Codex, Google Antigravity, OpenCode Go, and Cursor
+- Supports multiple accounts for Claude Code and Codex
 - Lives in the Windows taskbar with quick controls in the system tray
 - Supports multiple monitors and Windows startup
 - Includes configurable refresh intervals, providers, languages, and updates
@@ -252,11 +256,11 @@ For OpenCode Go, set `OPENCODE_GO_WORKSPACE_ID` and `OPENCODE_GO_AUTH_COOKIE`, o
 ```json
 {
   "workspaceId": "wrk_01...",
-  "authCookie": "your-opencode-auth-cookie"
+  "authCookie": "__Host-console_session=your-session-cookie-value"
 }
 ```
 
-The workspace ID is part of the OpenCode Go workspace URL. The auth cookie comes from an authenticated `opencode.ai` browser session. Set `OPENCODE_GO_CONFIG_FILE` to use a different config path.
+The workspace ID is part of the OpenCode Go console URL: `https://opencode.ai/console/<workspaceId>/go`. Copy the `__Host-console_session` cookie from an authenticated `opencode.ai` browser session, including its name as shown above. A full Cookie header containing `__Host-console_session` or the legacy `auth` cookie is also accepted unchanged; no empty `auth=;` prefix is needed. Bare legacy `auth` cookie values remain supported. These formats work for both `authCookie` and `OPENCODE_GO_AUTH_COOKIE`. Set `OPENCODE_GO_CONFIG_FILE` to use a different config path. The monitor reads usage from the console JSON API using this workspace ID and cookie.
 
 For Cursor, `CURSOR_SESSION_TOKEN` can override the automatically detected local session.
 
@@ -267,6 +271,15 @@ The monitor reads local sign-in credentials for enabled providers and sends usag
 Credentials are read without modifying the provider files that contain them. OpenCode Go credentials saved in a JSON configuration file are plain text and should be protected like a browser session cookie.
 
 ## Troubleshooting
+
+Hover over the tray icon for the latest failure reason, or check the account
+status under **Settings > Providers > Accounts**. Missing credentials, expired
+or rejected logins, network failures, HTTP errors, and unexpected usage responses
+have distinct messages. Sign in again using the Claude desktop app or the CLI
+that owns the affected account, then refresh the monitor.
+
+Open **Diagnostics** in the dashboard and enable recording to inspect or copy
+polling errors. Logging is optional; enable it before reproducing the problem.
 
 Run diagnostics with:
 

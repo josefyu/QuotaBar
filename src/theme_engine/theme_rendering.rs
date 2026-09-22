@@ -1,5 +1,23 @@
 use super::*;
 
+/// The automatic floating card owns its inset; it is not part of theme layout.
+pub fn surface_horizontal_padding(
+    theme: &ThemeDocument,
+    surface_index: usize,
+    runtime: ThemeRuntime,
+) -> u32 {
+    if runtime.surface_nest == SurfaceNest::Floating
+        && theme
+            .surfaces
+            .get(surface_index)
+            .is_some_and(|surface| matches!(surface.background, LayerBackground::None))
+    {
+        10
+    } else {
+        0
+    }
+}
+
 pub fn format_template(template: &str, context: &DataContext) -> String {
     let mut output = String::new();
     let chars: Vec<char> = template.chars().collect();
@@ -87,7 +105,11 @@ pub fn render_theme_surface_with_runtime_at_scale(
     let mut warnings = Vec::new();
     let (logical_width, logical_height) =
         resolve_object_size(surface, data, runtime, &mut warnings);
-    let width = scaled_render_dimension(logical_width, scale);
+    let padding = surface_horizontal_padding(theme, surface_index, runtime);
+    // Snap the translation once, including parent clips, so fractional DPI
+    // cannot trim a content pixel at the far edge of the inset.
+    let content_offset = (padding as f64 * scale).round() / scale;
+    let width = scaled_render_dimension(logical_width + 2 * padding, scale);
     let height = scaled_render_dimension(logical_height, scale);
     let resolved_canvas = Canvas {
         width: logical_width,
@@ -98,6 +120,33 @@ pub fn render_theme_surface_with_runtime_at_scale(
     };
     let context = DataContext::from_usage_with_runtime(data, &resolved_canvas, runtime);
     let mut pixels = vec![0u32; width as usize * height as usize];
+    if runtime.surface_nest == SurfaceNest::Floating
+        && matches!(surface.background, LayerBackground::None)
+    {
+        let alpha = ((runtime.floating_card_opacity.min(100) as u32 * 255) / 100) as u8;
+        let card_color = Rgba {
+            r: 24,
+            g: 24,
+            b: 32,
+            a: alpha,
+        };
+        let radius = 8.0 * scale;
+        fill_rounded(&mut pixels, width, height, card_color, radius);
+        let border_color = Rgba {
+            r: 255,
+            g: 255,
+            b: 255,
+            a: 35,
+        };
+        stroke_rounded_rectangle(
+            &mut pixels,
+            width,
+            height,
+            border_color,
+            radius,
+            (1.0 * scale).max(1.0),
+        );
+    }
     let root_layer = ResolvedObject {
         source: surface,
         x: 0.0,
@@ -118,13 +167,17 @@ pub fn render_theme_surface_with_runtime_at_scale(
         &root_layer,
         &context,
         scale,
+        content_offset,
         &mut warnings,
     );
 
     let (resolved, layer_warnings) =
         resolve_objects_for(surface, &resolved_canvas, &surface.children, data, runtime);
     warnings.extend(layer_warnings);
-    for object in resolved {
+    for mut object in resolved {
+        for clip in &mut object.clip {
+            clip.x += content_offset;
+        }
         render_resolved_object(
             &mut pixels,
             width,
@@ -132,6 +185,7 @@ pub fn render_theme_surface_with_runtime_at_scale(
             &object,
             &context,
             scale,
+            content_offset,
             &mut warnings,
         );
     }
@@ -190,6 +244,7 @@ pub(super) fn render_resolved_object(
     object: &ResolvedObject<'_>,
     context: &DataContext,
     scale: f64,
+    content_offset: f64,
     warnings: &mut Vec<String>,
 ) {
     let object_width = (object.width * scale).round().max(1.0) as u32;
@@ -233,7 +288,7 @@ pub(super) fn render_resolved_object(
         &local,
         object_width,
         object_height,
-        (object.x * scale).round(),
+        (object.x * scale).round() + (content_offset * scale).round(),
         (object.y * scale).round(),
         object.rotation,
         object.opacity,
@@ -300,6 +355,8 @@ pub fn hit_test_mouse_event(
         return None;
     }
     let (width, height) = resolve_object_size(surface, data, runtime, &mut Vec::new());
+    let padding = surface_horizontal_padding(theme, surface_index, runtime) as f64;
+    let x = x - padding;
     let canvas = Canvas {
         width,
         width_expression: Some(surface.width.clone()),
@@ -348,9 +405,9 @@ pub fn hit_test_mouse_event(
         && point_in_clip(
             (x, y),
             ClipRegion {
-                x: 0.0,
+                x: -padding,
                 y: 0.0,
-                width: width as f64,
+                width: width as f64 + 2.0 * padding,
                 height: height as f64,
                 rotation: evaluate(
                     &surface.rotation.0,
@@ -400,10 +457,29 @@ pub fn resolve_object_bounds_with_runtime(
         &mut Vec::new(),
         &mut Vec::new(),
     )?;
-    Some((geometry.x, geometry.y, geometry.width, geometry.height))
+    Some((
+        geometry.x + surface_horizontal_padding(theme, surface_index, runtime) as f64,
+        geometry.y,
+        geometry.width,
+        geometry.height,
+    ))
 }
 
 pub fn resolve_surface_size(
+    theme: &ThemeDocument,
+    surface_index: usize,
+    data: Option<&AppUsageData>,
+    runtime: ThemeRuntime,
+) -> (u32, u32) {
+    let (width, height) = resolve_surface_content_size(theme, surface_index, data, runtime);
+    (
+        width + 2 * surface_horizontal_padding(theme, surface_index, runtime),
+        height,
+    )
+}
+
+/// Expression canvases always describe the authored content, without card chrome.
+pub fn resolve_surface_content_size(
     theme: &ThemeDocument,
     surface_index: usize,
     data: Option<&AppUsageData>,
@@ -480,7 +556,7 @@ pub fn resolve_surface_placement(
             offset_y: theme.placement.offset_y,
         };
     };
-    let (width, height) = resolve_surface_size(theme, surface_index, data, runtime);
+    let (width, height) = resolve_surface_content_size(theme, surface_index, data, runtime);
     let canvas = Canvas {
         width,
         width_expression: Some(surface.width.clone()),
@@ -518,7 +594,7 @@ pub fn surface_should_render(
     let Some(surface) = theme.surfaces.get(surface_index) else {
         return surface_index == 0;
     };
-    let (width, height) = resolve_surface_size(theme, surface_index, data, runtime);
+    let (width, height) = resolve_surface_content_size(theme, surface_index, data, runtime);
     let canvas = Canvas {
         width,
         width_expression: Some(surface.width.clone()),

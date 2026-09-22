@@ -1,6 +1,200 @@
 use super::*;
 
 #[test]
+fn account_bindings_validate_without_live_credentials_or_usage() {
+    let mut theme = ThemeDocument::starter();
+    theme.id = "account-validation-test".into();
+    theme.surfaces[0].render = Expression("accounts.codex.account_1.available".into());
+    let text = theme.surfaces[0]
+        .children
+        .iter_mut()
+        .find_map(|object| {
+            if let SceneContent::Text { template, .. } = &mut object.content {
+                Some(template)
+            } else {
+                None
+            }
+        })
+        .unwrap();
+    *text = "{accounts.codex.account_1.name} {codex.account.name} {accounts.claude.work.weekly.percentage:0}%".into();
+    let errors = theme.validate();
+    assert!(errors.is_empty(), "{errors:?}");
+    let json = serde_json::to_string(&theme).unwrap();
+    let reloaded: ThemeDocument = serde_json::from_str(&json).unwrap();
+    assert!(reloaded.validate().is_empty());
+
+    let context = DataContext::from_usage(None, &Canvas::default());
+    assert_eq!(context.get("accounts.codex.account_1.available"), Some(0.0));
+    assert_eq!(
+        format_template("{accounts.codex.account_1.weekly:usage_line}", &context),
+        "--"
+    );
+    assert_eq!(
+        format_template(
+            "{accounts.codex.account_1.name}/{codex.account.name}",
+            &context
+        ),
+        "/"
+    );
+    for invalid in [
+        "accounts.codex.work.weekly.percentge",
+        "accounts.cursor.work.weekly.percentage",
+        "accounts.codex..available",
+    ] {
+        assert!(evaluate(invalid, &context).is_err(), "{invalid}");
+    }
+}
+
+#[test]
+fn normalized_account_ids_keep_theme_values_independent() {
+    use crate::accounts::{AccountProfile, ProviderAccounts};
+    use crate::models::{AccountUsage, UsageData, UsageSection};
+    let mut configured = ProviderAccounts {
+        profiles: ["Work", "work"]
+            .into_iter()
+            .map(|id| AccountProfile {
+                id: id.into(),
+                name: id.into(),
+                config_dir: format!("C:/review/{id}"),
+                ..Default::default()
+            })
+            .collect(),
+        ..Default::default()
+    };
+    configured.normalize();
+    let mut data = AppUsageData::default();
+    for (profile, percentage) in configured.profiles.iter().cloned().zip([25.0, 80.0]) {
+        data.accounts.push(AccountUsage {
+            provider: ProviderId::Codex,
+            profile,
+            source_signature: "fixture".into(),
+            source_path: None,
+            selected: false,
+            error: None,
+            usage: Some(UsageData {
+                weekly: UsageSection {
+                    available: true,
+                    percentage,
+                    resets_at: None,
+                },
+                ..Default::default()
+            }),
+        });
+    }
+    let context = DataContext::from_usage(Some(&data), &Canvas::default());
+    for (profile, expected) in configured.profiles.iter().zip([25.0, 80.0]) {
+        assert_eq!(
+            context.get(&format!("accounts.codex.{}.weekly.percentage", profile.id)),
+            Some(expected)
+        );
+    }
+    // Removal and startup use the same typed defaults, including countdown.
+    let empty = DataContext::from_usage_with_runtime(
+        None,
+        &Canvas::default(),
+        ThemeRuntime::default().with_countdown(true),
+    );
+    assert_eq!(empty.get("accounts.codex.Work.weekly.display"), Some(100.0));
+    assert_eq!(empty.get_string("accounts.codex.Work.name"), Some(""));
+}
+
+#[test]
+fn named_account_bindings_show_independent_usage_and_errors() {
+    use crate::accounts::{AccountProfile, AccountSettings};
+    use crate::models::{AccountUsage, UsageData, UsageSection};
+    let personal = AccountProfile {
+        id: "personal".into(),
+        name: "Personal".into(),
+        config_dir: "C:\\personal".into(),
+        ..Default::default()
+    };
+    let work = AccountProfile {
+        id: "work".into(),
+        name: "Work".into(),
+        config_dir: "C:\\work".into(),
+        ..Default::default()
+    };
+    let mut settings = AccountSettings::default();
+    settings.codex.profiles = vec![personal.clone(), work.clone()];
+    settings.codex.selected = "work".into();
+    let mut data = AppUsageData::default();
+    data.accounts = vec![
+        AccountUsage {
+            provider: ProviderId::Codex,
+            profile: personal,
+            source_signature: "fixture".into(),
+            source_path: None,
+            selected: false,
+            usage: Some(UsageData {
+                weekly: UsageSection {
+                    available: true,
+                    percentage: 25.0,
+                    resets_at: None,
+                },
+                ..Default::default()
+            }),
+            error: None,
+        },
+        AccountUsage {
+            provider: ProviderId::Codex,
+            profile: work,
+            source_signature: "fixture".into(),
+            source_path: None,
+            selected: false,
+            usage: None,
+            error: Some(crate::poller::PollError::AuthRequired),
+        },
+    ];
+    data.select_accounts(&settings);
+    let context = DataContext::from_usage_with_runtime(
+        Some(&data),
+        &Canvas::default(),
+        ThemeRuntime::default()
+            .with_poll_state(false, true)
+            .with_countdown(true),
+    );
+    assert_eq!(format_template("{codex.account.name}", &context), "Work");
+    assert_eq!(
+        format_template("{accounts.codex.personal.name}", &context),
+        "Personal"
+    );
+    assert_eq!(
+        format_template(
+            "{accounts.codex.personal.weekly.display:usage_line}",
+            &context
+        ),
+        "75%"
+    );
+    assert_eq!(
+        format_template("{accounts.codex.work.weekly:usage_badge}", &context),
+        "!"
+    );
+    assert_eq!(format_template("{codex.weekly:usage_badge}", &context), "!");
+    assert_eq!(
+        evaluate("accounts.codex.personal.weekly.percentage", &context).unwrap(),
+        25.0
+    );
+    assert_eq!(
+        evaluate("accounts.codex.work.selected", &context).unwrap(),
+        1.0
+    );
+    assert!(
+        !data.is_empty(),
+        "a healthy unselected account still has usable data"
+    );
+    data.accounts[1].error = None;
+    let waiting = DataContext::from_usage_with_runtime(
+        Some(&data),
+        &Canvas::default(),
+        ThemeRuntime::default().with_poll_state(true, false),
+    );
+    assert_eq!(
+        format_template("{accounts.codex.work.weekly:usage_badge}", &waiting),
+        "--"
+    );
+}
+
+#[test]
 fn managed_asset_paths_stay_inside_the_asset_directory() {
     assert_eq!(managed_asset_file_name("assets/logo.png"), Some("logo.png"));
     assert_eq!(managed_asset_file_name("logo.png"), None);
@@ -499,6 +693,7 @@ fn usage_lines_handle_loading_errors_missing_resets_and_language() {
     let usage = AppUsageData::from_iter([(
         ProviderId::Claude,
         crate::models::UsageData {
+            limits: Vec::new(),
             session: crate::models::UsageSection {
                 available: true,
                 percentage: 25.0,
@@ -674,6 +869,7 @@ fn reset_stats_and_duration_formats_are_available_to_every_provider() {
     let usage = crate::models::AppUsageData::from_iter([(
         ProviderId::Claude,
         crate::models::UsageData {
+            limits: Vec::new(),
             session: crate::models::UsageSection {
                 available: true,
                 percentage: 25.0,
@@ -806,6 +1002,124 @@ fn theme_surfaces_rasterize_at_requested_dpi_scales() {
         assert_eq!((rendered.width, rendered.height), (width, height));
         assert_eq!(rendered.pixels.len(), (width * height) as usize);
         assert!(rendered.warnings.is_empty());
+    }
+}
+
+#[test]
+fn floating_card_inset_preserves_content_layout_clipping_and_mouse_targets() {
+    let mut theme = ThemeDocument::starter();
+    let surface = &mut theme.surfaces[0];
+    surface.width = 40.0.into();
+    surface.height = 20.0.into();
+    surface.background = LayerBackground::None;
+    surface.content = SceneContent::None;
+    surface.border = None;
+    surface.mouse_events = Some(MouseEvents {
+        right_click: "refresh()".into(),
+        ..Default::default()
+    });
+    let root_id = surface.id.clone();
+    let mut parent = SceneObject::object("container", "Container");
+    parent.width = Expression("canvas.width".into());
+    parent.height = 20.0.into();
+    let mut child = SceneObject::object("edge", "Edge-to-edge content");
+    child.parent = Some(parent.id.clone());
+    child.y = 4.0.into();
+    child.width = Expression("canvas.width".into());
+    child.height = 12.0.into();
+    child.background = LayerBackground::Colour {
+        colour: Paint::new("#FF0000FF"),
+    };
+    // Moving the frame must not change authored expressions such as this.x.
+    if let LayerBackground::Colour { colour } = &mut child.background {
+        colour.opacity = Expression("this.x == 0".into());
+    }
+    child.mouse_events = Some(MouseEvents {
+        click: "refresh()".into(),
+        ..Default::default()
+    });
+    surface.children = vec![parent, child];
+    let docked = ThemeRuntime::default();
+    let floating = docked.with_nest(SurfaceNest::Floating);
+    assert_eq!(resolve_surface_size(&theme, 0, None, docked), (40, 20));
+    assert_eq!(resolve_surface_size(&theme, 0, None, floating), (60, 20));
+    assert_eq!(
+        resolve_surface_content_size(&theme, 0, None, floating),
+        (40, 20)
+    );
+    assert_eq!(
+        resolve_object_bounds_with_runtime(&theme, 0, 1, None, floating),
+        Some((10.0, 4.0, 40.0, 12.0))
+    );
+    assert_eq!(
+        hit_test_mouse_event(&theme, 0, 10.0, 10.0, None, floating).as_deref(),
+        Some("edge")
+    );
+    assert_eq!(
+        hit_test_mouse_event(&theme, 0, 49.9, 10.0, None, floating).as_deref(),
+        Some("edge")
+    );
+    for x in [0.0, 9.9, 50.0, 59.9] {
+        assert_eq!(
+            hit_test_mouse_event(&theme, 0, x, 10.0, None, floating).as_deref(),
+            Some(root_id.as_str())
+        );
+    }
+    assert_eq!(
+        hit_test_mouse_event(&theme, 0, 60.0, 10.0, None, floating),
+        None
+    );
+    let context = mouse_action_object_context(&theme, 0, "edge", None, floating).unwrap();
+    assert_eq!(context.get("canvas.width"), Some(40.0));
+    for scale in [1.0, 1.25, 1.5, 1.75, 2.0] {
+        let rendered = render_theme_surface_with_runtime_at_scale(&theme, 0, None, floating, scale);
+        assert!(rendered.warnings.is_empty());
+        assert_eq!(rendered.width, (60.0 * scale).round() as u32);
+        let y = (10.0 * scale) as u32;
+        let start = (10.0 * scale).round() as u32;
+        let end = start + (40.0 * scale).round() as u32;
+        for x in 0..rendered.width {
+            assert_eq!(
+                rendered.pixels[(y * rendered.width + x) as usize] == 0xFFFF0000,
+                (start..end).contains(&x),
+                "scale={scale}, x={x}"
+            );
+        }
+    }
+    // Authored backgrounds do not receive the automatic card or its padding.
+    theme.surfaces[0].background = LayerBackground::Colour {
+        colour: Paint::new("#123456FF"),
+    };
+    assert_eq!(resolve_surface_size(&theme, 0, None, floating), (40, 20));
+}
+
+#[test]
+fn compact_quad_only_grows_when_the_automatic_floating_card_is_present() {
+    let theme: ThemeDocument =
+        serde_json::from_str(include_str!("../themes/compact-fluent-quad.json")).unwrap();
+    for mask in 1..(1 << ProviderId::ALL.len()) {
+        let providers = ProviderSet::from_enabled(
+            ProviderId::ALL
+                .into_iter()
+                .enumerate()
+                .filter_map(|(i, p)| (mask & (1 << i) != 0).then_some(p)),
+        );
+        let runtime = ThemeRuntime::from_providers(providers);
+        let (width, height) = resolve_surface_size(&theme, 0, None, runtime);
+        assert_eq!(
+            resolve_surface_size(&theme, 0, None, runtime.with_nest(SurfaceNest::Floating)),
+            (width + 20, height)
+        );
+        for nest in [
+            SurfaceNest::Taskbar,
+            SurfaceNest::Desktop,
+            SurfaceNest::TrayIcon,
+        ] {
+            assert_eq!(
+                resolve_surface_size(&theme, 0, None, runtime.with_nest(nest)),
+                (width, height)
+            );
+        }
     }
 }
 
@@ -1244,8 +1558,9 @@ fn starter_tray_icons_follow_enabled_providers() {
 
 #[test]
 fn built_in_themes_are_valid_and_cannot_be_saved_as_editable_themes() {
-    assert_eq!(BUILTIN_THEME_SOURCES.len(), 1);
+    assert_eq!(BUILTIN_THEME_SOURCES.len(), 2);
     assert_eq!(BUILTIN_THEME_SOURCES[0].0, CLASSIC_THEME_ID);
+    assert_eq!(BUILTIN_THEME_SOURCES[1].0, COMPACT_FLUENT_QUAD_THEME_ID);
     assert!(REMOVED_BUILTIN_THEME_IDS
         .iter()
         .all(|id| !is_builtin_theme_id(id)));
@@ -1283,6 +1598,70 @@ fn built_in_themes_are_valid_and_cannot_be_saved_as_editable_themes() {
     duplicate.id = "classic-copy".into();
     assert!(!duplicate.is_builtin());
     assert!(!duplicate.is_builtin_classic());
+}
+
+#[test]
+fn compact_fluent_quad_widget_respects_usage_direction() {
+    use crate::models::{CreditsSection, UsageData, UsageSection};
+
+    let theme: ThemeDocument =
+        serde_json::from_str(include_str!("../themes/compact-fluent-quad.json")).unwrap();
+    let section = UsageSection {
+        available: true,
+        percentage: 25.0,
+        resets_at: None,
+    };
+    let usage = AppUsageData::from_iter(ProviderId::ALL.into_iter().map(|provider| {
+        (
+            provider,
+            UsageData {
+                session: section.clone(),
+                weekly: section.clone(),
+                credits: Some(CreditsSection {
+                    percentage: 25.0,
+                    remaining: 24.1,
+                    total: 40.83,
+                }),
+                ..Default::default()
+            },
+        )
+    }));
+    for (countdown, expected, text) in [(false, 25.0, "25%"), (true, 75.0, "75%")] {
+        let context = DataContext::from_usage_with_runtime(
+            Some(&usage),
+            &Canvas::default(),
+            ThemeRuntime::from_providers(ProviderSet::from_enabled(ProviderId::ALL))
+                .with_countdown(countdown),
+        );
+        for object in &theme.surfaces[0].children {
+            match &object.content {
+                SceneContent::Progress { value, .. } => {
+                    assert_eq!(
+                        evaluate(&value.0, &context).unwrap(),
+                        expected,
+                        "{}",
+                        object.id
+                    );
+                }
+                SceneContent::Text { template, .. } if template.contains(":usage_line}") => {
+                    assert!(
+                        format_template(template, &context).contains(text),
+                        "{}",
+                        object.id
+                    );
+                }
+                SceneContent::Text { template, .. } if template.contains(".credits.balance") => {
+                    assert_eq!(
+                        format_template(template, &context),
+                        "$24.10",
+                        "{}",
+                        object.id
+                    );
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 #[test]

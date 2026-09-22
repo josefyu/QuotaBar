@@ -170,6 +170,7 @@ enum Page {
     Studio,
     ContextMenus,
     Assets,
+    Diagnostics,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -439,6 +440,7 @@ struct ThemeDeletionConfirmation {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum PendingUnsavedAction {
     Close,
+    Update { install: bool },
     ActivateTheme(PathBuf),
     NewTheme,
 }
@@ -637,8 +639,8 @@ fn preview_render_scale(
 fn preview_countdown_refresh_delay(data: Option<&AppUsageData>) -> Option<Duration> {
     let now = std::time::SystemTime::now();
     data?
-        .iter()
-        .flat_map(|(_, usage)| [&usage.session, &usage.weekly])
+        .all_usage()
+        .flat_map(|usage| [&usage.session, &usage.weekly])
         .filter_map(|section| section.resets_at?.duration_since(now).ok())
         .map(preview_countdown_delay)
         .min()
@@ -655,8 +657,12 @@ fn preview_countdown_delay(remaining: Duration) -> Duration {
 
 struct StudioApp {
     owner: isize,
+    update_status: crate::dashboard::UpdateStatus,
+    diagnostics: studio_diagnostics::DiagnosticsView,
     page: Page,
     settings: SettingsFile,
+    synced_poll_interval_ms: u32,
+    poll_interval_editor_generation: u64,
     startup_enabled: bool,
     theme: ThemeDocument,
     theme_path: Option<PathBuf>,
@@ -711,6 +717,7 @@ struct StudioApp {
 mod studio_assets;
 mod studio_context_menus;
 mod studio_core;
+mod studio_diagnostics;
 mod studio_settings;
 mod studio_theme_workspace;
 

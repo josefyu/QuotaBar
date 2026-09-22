@@ -13,6 +13,8 @@ use super::{
 use crate::diagnose;
 use crate::models::{CreditsSection, UsageData};
 
+mod limits;
+
 const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 const MESSAGES_URL: &str = "https://api.anthropic.com/v1/messages";
 const MODEL_FALLBACK_CHAIN: &[&str] = &["claude-3-haiku-20240307", "claude-haiku-4-5-20251001"];
@@ -23,6 +25,9 @@ struct UsageResponse {
     five_hour: Option<UsageBucket>,
     seven_day: Option<UsageBucket>,
     spend: Option<SpendResponse>,
+    limits: Option<Vec<serde_json::Value>>,
+    #[serde(flatten)]
+    extra: std::collections::BTreeMap<String, serde_json::Value>,
 }
 
 /// Paid credits that carry the account past its plan limits. Amounts are
@@ -81,16 +86,92 @@ pub(super) fn poll_claude_code() -> Result<UsageData, PollError> {
         }
     };
 
-    let creds = refresh_or_fallback(creds)?;
+    let creds = refresh_credentials(creds)?;
 
     fetch_usage_with_fallback(&creds.access_token)
+}
+
+/// Explicit profiles are pinned to one source, including when refresh fails.
+///
+/// The one exception is a profile sitting on the default CLI path. That path
+/// is where the desktop app's Claude Code build would have logged in too, and
+/// the desktop app can leave `.credentials.json` present but tokenless once it
+/// takes the login over. Treating "no token there" as the end of the search
+/// hides a perfectly good desktop token, so the default path — and only the
+/// default path — falls through to the desktop app. A custom export stays
+/// pinned, so a multi-account setup can never borrow another account's token.
+pub(super) fn poll_account(path: &Path) -> Result<UsageData, PollError> {
+    let mut credentials =
+        match read_credentials_from_source(&CredentialSource::Windows(path.to_path_buf())) {
+            Some(credentials) => credentials,
+            None => desktop_credentials_for_default_path(path).ok_or(PollError::NoCredentials)?,
+        };
+
+    // Refresh against whichever source actually produced the token.
+    let source = credentials.source.clone();
+    if is_token_expired(credentials.expires_at) {
+        cli_refresh_token(&source);
+        credentials = read_credentials_from_source(&source).ok_or(PollError::TokenExpired)?;
+        if is_token_expired(credentials.expires_at) {
+            return Err(PollError::TokenExpired);
+        }
+    }
+    fetch_usage_with_fallback(&credentials.access_token)
+}
+
+/// The desktop app's token, but only for a profile that points at the default
+/// CLI credentials path.
+fn desktop_credentials_for_default_path(path: &Path) -> Option<Credentials> {
+    let credentials = desktop_fallback_paths(path)
+        .iter()
+        .find_map(|path| read_desktop_app_credentials(path))?;
+    diagnose::log("default profile fell back to the Claude desktop app token cache");
+    Some(credentials)
+}
+
+fn desktop_fallback_paths(path: &Path) -> Vec<PathBuf> {
+    let Some(default) =
+        crate::accounts::default_credential_path(crate::providers::ProviderId::Claude)
+    else {
+        return Vec::new();
+    };
+    let explicit = std::env::var_os("CLAUDE_CONFIG_DIR").is_some_and(|value| !value.is_empty());
+    desktop_fallback_allowed(path, &default, explicit)
+        .then(claude_desktop::config_paths)
+        .unwrap_or_default()
+}
+
+fn desktop_fallback_allowed(path: &Path, default: &Path, explicit_directory: bool) -> bool {
+    // default_credential_path also honors CLAUDE_CONFIG_DIR. That is an
+    // explicit account selection, not permission to use the desktop login.
+    !explicit_directory && crate::accounts::source_key(path) == crate::accounts::source_key(default)
+}
+
+pub(super) fn account_watch_signature(path: &Path) -> String {
+    account_watch_signature_with_desktop(path, &desktop_fallback_paths(path))
+}
+
+fn account_watch_signature_with_desktop(path: &Path, desktops: &[PathBuf]) -> String {
+    let mut signature = crate::accounts::file_signature(path);
+    if desktops.is_empty() {
+        return signature;
+    }
+    // Default-path accounts can use either installation. Include even missing
+    // caches so a new Store login resumes polling; custom accounts stay pinned.
+    for desktop in desktops {
+        signature.push('|');
+        signature.push_str(&claude_desktop::watch_signature(desktop));
+    }
+    crate::accounts::fingerprint(&signature)
 }
 
 pub(super) fn fetch_usage_with_fallback(token: &str) -> Result<UsageData, PollError> {
     // Try the dedicated usage endpoint first
     if let Some(data) = try_usage_endpoint(token)? {
         // If reset timers are missing, fill them in from the Messages API
-        if data.session.resets_at.is_none() || data.weekly.resets_at.is_none() {
+        if (data.session.available && data.session.resets_at.is_none())
+            || (data.weekly.available && data.weekly.resets_at.is_none())
+        {
             if let Ok(fallback) = fetch_usage_via_messages(token) {
                 let mut merged = data;
                 merged.session.available |= fallback.session.available;
@@ -130,11 +211,11 @@ pub(super) fn try_usage_endpoint(token: &str) -> Result<Option<UsageData>, PollE
                 diagnose::log(format!(
                     "usage endpoint returned an auth error ({error}); re-login required"
                 ));
-                return Err(PollError::AuthRequired);
+                return Err(usage_request_error(&error));
             }
             UsageEndpointFailure::Transient => {
                 diagnose::log(format!("usage endpoint temporarily unavailable ({error})"));
-                return Err(PollError::RequestFailed);
+                return Err(usage_request_error(&error));
             }
             UsageEndpointFailure::Unsupported => {
                 diagnose::log(format!(
@@ -145,15 +226,37 @@ pub(super) fn try_usage_endpoint(token: &str) -> Result<Option<UsageData>, PollE
         },
     };
 
-    let response: UsageResponse = match resp.body_mut().read_json() {
+    parse_usage_body(resp.body_mut()).map(Some)
+}
+
+fn parse_usage_body(body: &mut ureq::Body) -> Result<UsageData, PollError> {
+    let response: UsageResponse = match body.read_json() {
         Ok(response) => response,
-        Err(_) => return Ok(None),
+        Err(error) => {
+            diagnose::log_error("unexpected Claude usage response", error);
+            return Err(PollError::UnexpectedResponse);
+        }
     };
-    Ok(Some(usage_from_response(response)))
+    validated_usage_from_response(response)
+}
+
+fn validated_usage_from_response(response: UsageResponse) -> Result<UsageData, PollError> {
+    let data = usage_from_response(response);
+    if !data.sections().any(|section| section.available) {
+        diagnose::log("unexpected Claude usage response: no usable usage limits");
+        return Err(PollError::UnexpectedResponse);
+    }
+    Ok(data)
 }
 
 fn usage_from_response(response: UsageResponse) -> UsageData {
-    let mut data = UsageData::default();
+    let mut data = UsageData {
+        limits: limits::parse(
+            response.limits.as_deref().unwrap_or_default(),
+            &response.extra,
+        ),
+        ..Default::default()
+    };
 
     if let Some(bucket) = &response.five_hour {
         data.session.available = true;
@@ -165,6 +268,18 @@ fn usage_from_response(response: UsageResponse) -> UsageData {
         data.weekly.available = true;
         data.weekly.percentage = bucket.utilization;
         data.weekly.resets_at = parse_iso8601(bucket.resets_at.as_deref());
+    }
+
+    // New-format responses may omit the legacy fields. Scoped quotas never
+    // replace the all-model session or weekly values used by built-in themes.
+    for limit in &data.limits {
+        if limit.scope.is_none() {
+            match limit.kind.as_str() {
+                "session" if !data.session.available => data.session = limit.usage.clone(),
+                "weekly_all" if !data.weekly.available => data.weekly = limit.usage.clone(),
+                _ => {}
+            }
+        }
     }
 
     data.credits = response
@@ -200,6 +315,13 @@ fn classify_usage_failure(error: &ureq::Error) -> UsageEndpointFailure {
     }
 }
 
+fn usage_request_error(error: &ureq::Error) -> PollError {
+    match error {
+        ureq::Error::StatusCode(status) => PollError::HttpStatus(*status),
+        _ => PollError::NetworkError,
+    }
+}
+
 /// Unlike Codex, the plan states its own ceiling, so the gauge needs no
 /// history: `used` is already the spend against the current cap, and a
 /// non-zero figure is the same "credits are in play" observation that the
@@ -228,6 +350,7 @@ fn claude_credits(spend: &SpendResponse, data: &UsageData) -> Option<CreditsSect
 
 pub(super) fn fetch_usage_via_messages(token: &str) -> Result<UsageData, PollError> {
     let agent = build_agent()?;
+    let mut last_error = PollError::RequestFailed;
 
     for model in MODEL_FALLBACK_CHAIN {
         let body = serde_json::json!({
@@ -247,7 +370,10 @@ pub(super) fn fetch_usage_via_messages(token: &str) -> Result<UsageData, PollErr
             .send_json(&body)
         {
             Ok(resp) => resp,
-            Err(_) => continue,
+            Err(error) => {
+                last_error = usage_request_error(&error);
+                continue;
+            }
         };
 
         let status = response.status().as_u16();
@@ -255,7 +381,7 @@ pub(super) fn fetch_usage_via_messages(token: &str) -> Result<UsageData, PollErr
             diagnose::log(format!(
                 "messages endpoint returned auth error status {status}; re-login required"
             ));
-            return Err(PollError::AuthRequired);
+            return Err(PollError::HttpStatus(status));
         }
 
         let h5 = response
@@ -269,9 +395,14 @@ pub(super) fn fetch_usage_via_messages(token: &str) -> Result<UsageData, PollErr
         if h5.is_some() || h7.is_some() || hs.is_some() {
             return Ok(parse_rate_limit_headers(&response));
         }
+        last_error = if response.status().is_client_error() || response.status().is_server_error() {
+            PollError::HttpStatus(status)
+        } else {
+            PollError::RequestFailed
+        };
     }
 
-    Err(PollError::RequestFailed)
+    Err(last_error)
 }
 
 pub(super) fn parse_rate_limit_headers(response: &HttpResponse) -> UsageData {
@@ -348,35 +479,32 @@ pub(super) fn credential_watch_snapshot(all_sources: bool) -> Vec<String> {
     snapshot
 }
 
-fn refresh_or_fallback(mut credentials: Credentials) -> Result<Credentials, PollError> {
-    loop {
-        if !is_token_expired(credentials.expires_at) {
-            return Ok(credentials);
-        }
-
-        let source = credentials.source.clone();
-        cli_refresh_token(&source);
-
-        match read_credentials_from_source(&source) {
-            Some(refreshed) if !is_token_expired(refreshed.expires_at) => return Ok(refreshed),
-            Some(_) => diagnose::log(format!(
-                "credentials from {source:?} still expired after refresh attempt"
-            )),
-            None => diagnose::log(format!(
-                "credentials from {source:?} unavailable after refresh attempt"
-            )),
-        }
-
-        match read_next_credentials_after(&source) {
-            Some(next) => credentials = next,
-            None => return Err(PollError::TokenExpired),
-        }
+fn refresh_credentials(credentials: Credentials) -> Result<Credentials, PollError> {
+    if !is_token_expired(credentials.expires_at) {
+        return Ok(credentials);
     }
+    let source = credentials.source;
+    cli_refresh_token(&source);
+    // An expired login is still a selected account. Do not replace it with
+    // another account found in Desktop or WSL when its refresh fails.
+    read_credentials_from_source(&source)
+        .filter(|credentials| !is_token_expired(credentials.expires_at))
+        .ok_or(PollError::TokenExpired)
 }
 
 fn cli_refresh_token(source: &CredentialSource) {
     match source {
-        CredentialSource::Windows(_) => cli_refresh_windows_token(),
+        CredentialSource::Windows(path) => {
+            // The CLI only owns this filename. A custom export is read-only.
+            if path
+                .file_name()
+                .is_some_and(|name| name == ".credentials.json")
+            {
+                if let Some(directory) = path.parent() {
+                    cli_refresh_windows_token(directory);
+                }
+            }
+        }
         // The desktop app owns this token and refreshes it itself, so there is
         // nothing to drive from here; re-reading the cache is the whole retry.
         CredentialSource::DesktopApp(_) => {
@@ -386,7 +514,7 @@ fn cli_refresh_token(source: &CredentialSource) {
     }
 }
 
-fn cli_refresh_windows_token() {
+fn cli_refresh_windows_token(directory: &Path) {
     let claude_path = resolve_windows_claude_path();
     let is_cmd = claude_path.to_lowercase().ends_with(".cmd");
     diagnose::log(format!(
@@ -404,6 +532,7 @@ fn cli_refresh_windows_token() {
         command
     };
     command
+        .env("CLAUDE_CONFIG_DIR", directory)
         .env_remove("CLAUDECODE")
         .env_remove("CLAUDE_CODE_ENTRYPOINT")
         .creation_flags(CREATE_NO_WINDOW)
@@ -432,7 +561,7 @@ fn cli_refresh_wsl_token(distro: &str) {
         .arg("--")
         .arg("bash")
         .arg("-lic")
-        .arg("if command -v claude >/dev/null 2>&1; then claude -p .; elif [ -x \"$HOME/.local/bin/claude\" ]; then \"$HOME/.local/bin/claude\" -p .; else exit 127; fi")
+        .arg("export CLAUDE_CONFIG_DIR=\"$HOME/.claude\"; if command -v claude >/dev/null 2>&1; then claude -p .; elif [ -x \"$HOME/.local/bin/claude\" ]; then \"$HOME/.local/bin/claude\" -p .; else exit 127; fi")
         .env_remove("CLAUDECODE")
         .env_remove("CLAUDE_CODE_ENTRYPOINT")
         .creation_flags(CREATE_NO_WINDOW)
@@ -495,9 +624,13 @@ fn resolve_windows_claude_path() -> String {
 /// `%APPDATA%\Claude\claude-code\<version>\claude.exe`, which is the only
 /// Claude binary present when the standalone CLI was never installed.
 fn bundled_desktop_claude_path() -> Option<PathBuf> {
-    let versions = dirs::config_dir()?.join("Claude").join("claude-code");
-    let mut candidates: Vec<PathBuf> = std::fs::read_dir(versions)
-        .ok()?
+    let mut candidates: Vec<PathBuf> = claude_desktop::data_directories()
+        .into_iter()
+        .flat_map(|path| {
+            std::fs::read_dir(path.join("claude-code"))
+                .into_iter()
+                .flatten()
+        })
         .flatten()
         .map(|entry| entry.path().join("claude.exe"))
         .filter(|path| path.is_file())
@@ -595,29 +728,39 @@ fn parse_credentials(content: &str, source: CredentialSource) -> Option<Credenti
     let json: serde_json::Value = serde_json::from_str(content).ok()?;
     let oauth = json.get("claudeAiOauth")?;
     Some(Credentials {
-        access_token: oauth.get("accessToken")?.as_str()?.to_string(),
+        access_token: oauth
+            .get("accessToken")?
+            .as_str()
+            .filter(|token| !token.trim().is_empty())?
+            .to_string(),
         expires_at: oauth.get("expiresAt").and_then(|value| value.as_i64()),
         source,
     })
 }
 
-fn read_next_credentials_after(source: &CredentialSource) -> Option<Credentials> {
-    credential_sources_in_order()
-        .skip_while(|candidate| candidate != source)
-        .skip(1)
-        .find_map(|candidate| read_credentials_from_source(&candidate))
-}
-
 /// Credential sources, cheapest first. The WSL probe stays lazy so a machine
 /// that resolves a token locally never has to spawn `wsl.exe`.
 fn credential_sources_in_order() -> impl Iterator<Item = CredentialSource> {
+    let explicit = std::env::var_os("CLAUDE_CONFIG_DIR").is_some_and(|value| !value.is_empty());
     windows_credential_source()
         .into_iter()
-        .chain(desktop_app_credential_source())
         .chain(
-            std::iter::once_with(list_wsl_distros)
+            (!explicit)
+                .then(claude_desktop::config_paths)
+                .into_iter()
                 .flatten()
-                .map(|distro| CredentialSource::Wsl { distro }),
+                .map(CredentialSource::DesktopApp),
+        )
+        .chain(
+            std::iter::once_with(move || {
+                if explicit {
+                    Vec::new()
+                } else {
+                    list_wsl_distros()
+                }
+            })
+            .flatten()
+            .map(|distro| CredentialSource::Wsl { distro }),
         )
 }
 
@@ -626,13 +769,20 @@ fn all_known_credential_sources() -> Vec<CredentialSource> {
 }
 
 fn windows_credential_source() -> Option<CredentialSource> {
+    if std::env::var_os("CLAUDE_CONFIG_DIR").is_some_and(|value| !value.is_empty()) {
+        return crate::accounts::environment_directory(crate::providers::ProviderId::Claude)
+            .map(|directory| CredentialSource::Windows(directory.join(".credentials.json")));
+    }
     Some(CredentialSource::Windows(
         dirs::home_dir()?.join(".claude").join(".credentials.json"),
     ))
 }
 
-fn desktop_app_credential_source() -> Option<CredentialSource> {
-    claude_desktop::config_path().map(CredentialSource::DesktopApp)
+pub(super) fn native_credential_path() -> Option<PathBuf> {
+    match windows_credential_source()? {
+        CredentialSource::Windows(path) if read_windows_credentials(&path).is_some() => Some(path),
+        _ => None,
+    }
 }
 
 fn credential_watch_signature(source: &CredentialSource) -> Option<String> {
@@ -651,7 +801,7 @@ fn windows_credential_watch_signature(path: &PathBuf) -> String {
                 .modified()
                 .ok()
                 .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
-                .map(|value| value.as_secs())
+                .map(|value| value.as_nanos())
                 .unwrap_or(0);
             format!("{key}|present|{}|{modified}", metadata.len())
         }
@@ -789,6 +939,147 @@ mod tests {
     use std::path::Path;
 
     #[test]
+    fn http_failures_keep_their_status_for_account_display() {
+        for status in [401, 403, 429, 500, 503] {
+            assert_eq!(
+                usage_request_error(&ureq::Error::StatusCode(status)),
+                PollError::HttpStatus(status)
+            );
+        }
+    }
+
+    /// Ignored by default: proves the default profile resolves usage on a
+    /// machine where only the desktop app holds a token. Run it with
+    /// `cargo test -- --ignored` while signed in to the desktop app.
+    #[test]
+    #[ignore = "requires a signed-in Claude desktop app on this machine"]
+    fn the_default_profile_resolves_usage_from_the_desktop_app() {
+        let path = crate::accounts::default_credential_path(crate::providers::ProviderId::Claude)
+            .expect("a default credential path");
+        let outcome = poll_account(&path);
+        assert!(
+            outcome.is_ok(),
+            "the default profile should resolve usage from the desktop app, got {outcome:?}"
+        );
+    }
+
+    #[test]
+    fn a_custom_export_never_falls_back_to_the_desktop_app() {
+        // The desktop fallback is scoped to the default CLI path. A profile
+        // pointing somewhere else must stay pinned even on this machine,
+        // where the desktop app does have a usable token.
+        let path = std::env::temp_dir().join("claude-custom-export.json");
+        assert!(desktop_credentials_for_default_path(&path).is_none());
+    }
+
+    #[test]
+    fn an_environment_selected_directory_never_uses_the_desktop_login() {
+        let native = Path::new("C:/claude-fallback-test/.claude/.credentials.json");
+        let custom = Path::new("C:/claude-fallback-test/work/.credentials.json");
+        assert!(desktop_fallback_allowed(native, native, false));
+        assert!(!desktop_fallback_allowed(custom, native, false));
+        // The environment-selected path is also returned as the "default".
+        assert!(!desktop_fallback_allowed(custom, custom, true));
+        assert!(!desktop_fallback_allowed(native, native, true));
+    }
+
+    #[test]
+    fn default_profile_watches_desktop_login_and_rotation_without_window_state_noise() {
+        let directory = std::env::temp_dir().join(format!(
+            "claude-desktop-watch-test-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let native = directory.join(".credentials.json");
+        let desktop = directory.join("config.json");
+        // A tokenless CLI file remains unchanged throughout desktop login.
+        std::fs::write(&native, r#"{"claudeAiOauth":{"accessToken":""}}"#).unwrap();
+        let pinned = account_watch_signature_with_desktop(&native, &[]);
+        assert_eq!(pinned, crate::accounts::file_signature(&native));
+        let missing = account_watch_signature_with_desktop(&native, std::slice::from_ref(&desktop));
+        std::fs::write(
+            &desktop,
+            r#"{"oauth:tokenCache":"legacy","oauth:tokenCacheV2":"first","window":1}"#,
+        )
+        .unwrap();
+        let logged_in =
+            account_watch_signature_with_desktop(&native, std::slice::from_ref(&desktop));
+        assert_ne!(missing, logged_in);
+        std::fs::write(
+            &desktop,
+            r#"{"oauth:tokenCache":"legacy","oauth:tokenCacheV2":"first","window":2}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            logged_in,
+            account_watch_signature_with_desktop(&native, std::slice::from_ref(&desktop))
+        );
+        std::fs::write(
+            &desktop,
+            r#"{"oauth:tokenCache":"legacy","oauth:tokenCacheV2":"rotated","window":2}"#,
+        )
+        .unwrap();
+        assert_ne!(
+            logged_in,
+            account_watch_signature_with_desktop(&native, std::slice::from_ref(&desktop))
+        );
+        assert_eq!(pinned, account_watch_signature_with_desktop(&native, &[]));
+        std::fs::remove_file(&desktop).unwrap();
+        assert_eq!(
+            missing,
+            account_watch_signature_with_desktop(&native, std::slice::from_ref(&desktop))
+        );
+        std::fs::remove_file(&native).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn default_profile_watches_both_desktop_installations() {
+        let root = crate::app_settings::app_data_directory();
+        let native = root.join(".credentials.json");
+        let desktops = vec![root.join("regular.json"), root.join("store.json")];
+        std::fs::write(&desktops[0], r#"{"oauth:tokenCacheV2":"regular"}"#).unwrap();
+        let before = account_watch_signature_with_desktop(&native, &desktops);
+        let pinned = account_watch_signature_with_desktop(&native, &[]);
+        std::fs::write(&desktops[1], r#"{"oauth:tokenCacheV2":"store-login"}"#).unwrap();
+        let logged_in = account_watch_signature_with_desktop(&native, &desktops);
+        assert_ne!(before, logged_in);
+        std::fs::write(&desktops[1], r#"{"oauth:tokenCacheV2":"store-rotated"}"#).unwrap();
+        assert_ne!(
+            logged_in,
+            account_watch_signature_with_desktop(&native, &desktops)
+        );
+        assert_eq!(pinned, account_watch_signature_with_desktop(&native, &[]));
+    }
+
+    #[test]
+    fn explicit_missing_or_expired_export_never_uses_another_login() {
+        let directory = std::env::temp_dir().join(format!(
+            "claude-profile-test-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("export.json");
+        assert_eq!(poll_account(&path), Err(PollError::NoCredentials));
+        std::fs::write(
+            &path,
+            r#"{"claudeAiOauth":{"accessToken":"fixture-token","expiresAt":0}}"#,
+        )
+        .unwrap();
+        assert_eq!(poll_account(&path), Err(PollError::TokenExpired));
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
     fn bundled_claude_versions_sort_numerically() {
         let older = bundled_claude_version(Path::new("Claude/claude-code/2.1.9/claude.exe"));
         let newer = bundled_claude_version(Path::new("Claude/claude-code/2.1.10/claude.exe"));
@@ -801,6 +1092,88 @@ mod tests {
         let version = bundled_claude_version(Path::new("Claude/claude-code/current/claude.exe"));
 
         assert_eq!(version, None);
+    }
+
+    #[test]
+    fn malformed_usage_responses_are_distinct_from_network_and_auth_failures() {
+        for json in [
+            "not json",
+            "{}",
+            r#"{"five_hour":{"utilization":"wrong"}}"#,
+            r#"{"limits":[{"kind":"weekly_scoped"}]}"#,
+        ] {
+            let mut body = ureq::Body::builder().data(json.as_bytes().to_vec());
+            assert_eq!(
+                parse_usage_body(&mut body),
+                Err(PollError::UnexpectedResponse)
+            );
+        }
+        assert!(PollError::UnexpectedResponse.is_transient());
+        assert!(!PollError::UnexpectedResponse.is_auth());
+    }
+
+    #[test]
+    fn array_only_usage_fills_standard_windows_without_using_scoped_caps() {
+        let mut body = ureq::Body::builder().data(br#"{"limits":[
+            {"kind":"session","percent":29},
+            {"kind":"weekly_all","percent":26},
+            {"kind":"weekly_scoped","percent":99,"is_active":true,"scope":{"model":{"display_name":"Fable"}}}
+        ]}"#.to_vec());
+        let data = parse_usage_body(&mut body).unwrap();
+        assert_eq!(data.session.percentage, 29.0);
+        assert_eq!(data.weekly.percentage, 26.0);
+        assert_eq!(data.limits.len(), 3);
+        assert!(data.session.available && data.weekly.available);
+        let data = usage_from_json(
+            r#"{"five_hour":{"utilization":10},"seven_day":{"utilization":20},"limits":[{"kind":"session","percent":90},{"kind":"weekly_all","percent":95}]}"#,
+        );
+        assert_eq!(data.session.percentage, 10.0);
+        assert_eq!(data.weekly.percentage, 20.0);
+    }
+
+    #[test]
+    fn scoped_limits_survive_cache_and_reach_custom_theme_bindings() {
+        use crate::providers::ProviderId;
+        use crate::theme_engine::{evaluate, format_template, Canvas, DataContext, ThemeRuntime};
+        let usage = usage_from_json(
+            r#"{"five_hour":{"utilization":29},"seven_day":{"utilization":26},"limits":[{"kind":"weekly_scoped","percent":43,"is_active":true,"scope":{"model":{"id":null,"display_name":"Fable"}}}]}"#,
+        );
+        let data = crate::models::AppUsageData::from_iter([(ProviderId::Claude, usage)]);
+        let json = serde_json::to_string(&data).unwrap();
+        let cached: crate::models::AppUsageData = serde_json::from_str(&json).unwrap();
+        assert_eq!(data, cached);
+        let context = DataContext::from_usage_with_runtime(
+            Some(&cached),
+            &Canvas::default(),
+            ThemeRuntime::default().with_countdown(true),
+        );
+        for key in [
+            "claude.limits.weekly_scoped_fable",
+            "claude.model.fable",
+            "claude.scoped",
+        ] {
+            assert_eq!(
+                evaluate(&format!("{key}.percentage"), &context).unwrap(),
+                43.0
+            );
+            assert_eq!(evaluate(&format!("{key}.display"), &context).unwrap(), 57.0);
+            assert_eq!(
+                format_template(&format!("{{{key}.label}} {{{key}:usage_line}}"), &context),
+                "Fable 43%"
+            );
+            assert_eq!(
+                format_template(&format!("{{{key}.display:usage_badge}}"), &context),
+                "57%"
+            );
+        }
+        assert_eq!(
+            evaluate("claude.headline.percentage", &context).unwrap(),
+            29.0
+        );
+        assert_eq!(
+            evaluate("claude.weekly.percentage", &context).unwrap(),
+            26.0
+        );
     }
 
     fn usage_from_json(json: &str) -> UsageData {

@@ -497,37 +497,63 @@ pub(super) fn format_usage_reset_line(base: &str, context: &DataContext) -> Opti
     format_usage_summary(base, context, true)
 }
 
+/// Upstream resolves the provider, the window and the metric from `base`
+/// itself, which is what keeps named accounts (`accounts.claude.<id>.…`)
+/// working here.
 fn format_usage_summary(base: &str, context: &DataContext, clock: bool) -> Option<String> {
-    let mut parts = base.split('.');
-    let provider = parts.next()?;
-    let window = parts.next()?;
     // Existing summaries always show consumption. A `.display` suffix opts
     // this individual token into the user's usage direction preference.
-    let metric = match parts.next() {
-        None => "percentage",
-        Some("display") => "display",
-        Some(_) => return None,
+    let (base, metric) = base
+        .strip_suffix(".display")
+        .map(|base| (base, "display"))
+        .unwrap_or((base, "percentage"));
+    let dynamic = DataContext::limit_field(&format!("{base}.available"))
+        .filter(|(_, field)| *field == "available")
+        .map(|(owner, _)| owner.to_string());
+    let (provider, window) = if let Some(owner) = dynamic.as_deref() {
+        (owner, &base[owner.len() + 1..])
+    } else {
+        base.rsplit_once('.')?
     };
-    if parts.next().is_some()
-        || !matches!(
+    let named_account = provider
+        .strip_prefix("accounts.")
+        .and_then(|path| path.split_once('.'))
+        .is_some_and(|(provider, id)| {
+            matches!(provider, "claude" | "codex")
+                && !id.is_empty()
+                && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+        });
+    if (!named_account
+        && !matches!(
             provider,
             "active" | "claude" | "codex" | "antigravity" | "opencode" | "cursor"
-        )
-        || !matches!(
-            window,
-            "session" | "five_hour" | "weekly" | "monthly" | "credits"
-        )
+        ))
+        || (dynamic.is_none()
+            && !matches!(
+                window,
+                "session" | "five_hour" | "weekly" | "monthly" | "credits"
+            ))
     {
         return None;
     }
-    if context.get("data.loading").unwrap_or(0.0) != 0.0 {
+    let scoped_error = context.get(&format!("{provider}.has_error"));
+    if scoped_error.is_none() && context.get("data.loading").unwrap_or(0.0) != 0.0 {
         return Some("--".into());
     }
-    if context.get("data.has_error").unwrap_or(0.0) != 0.0
+    let available = context.get(&format!("{provider}.available")).unwrap_or(0.0) != 0.0;
+    if scoped_error == Some(0.0) && !available {
+        return Some("--".into());
+    }
+    if scoped_error
+        .map(|error| error != 0.0 && !available)
+        .unwrap_or_else(|| context.get("data.has_error").unwrap_or(0.0) != 0.0)
         || (context.get("data.poll_ok").unwrap_or(1.0) != 0.0
             && context.get(&format!("{provider}.available")).unwrap_or(0.0) == 0.0)
     {
         return Some("!".into());
+    }
+    if dynamic.is_some() && context.get(&format!("{base}.available")) == Some(0.0) {
+        return Some("--".into());
     }
     let percentage = context
         .get(&format!("{provider}.{window}.{metric}"))

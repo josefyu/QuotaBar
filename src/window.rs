@@ -17,13 +17,12 @@ use windows::Win32::UI::HiDpi::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetDoubleClickTime, ReleaseCapture, SetCapture, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT,
 };
-use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::app_settings::{
-    self, load_settings, save_settings, LegacyPlacement, SettingsFile, POLL_15_MIN,
-    POLL_15_MIN_SECONDS, POLL_1_HOUR, POLL_1_HOUR_SECONDS, POLL_1_MIN, POLL_1_MIN_SECONDS,
-    POLL_5_MIN, POLL_5_MIN_SECONDS,
+    self, load_settings, save_settings, LegacyPlacement, PlacementOverride, SettingsFile,
+    POLL_15_MIN, POLL_15_MIN_SECONDS, POLL_1_HOUR, POLL_1_HOUR_SECONDS, POLL_1_MIN,
+    POLL_1_MIN_SECONDS, POLL_5_MIN, POLL_5_MIN_SECONDS,
 };
 use crate::context_menu::{self, ContextMenuAction, ContextMenuItem, ContextMenuItemKind};
 use crate::diagnose;
@@ -31,8 +30,10 @@ use crate::localization::{self, LanguageId, Strings};
 use crate::models::AppUsageData;
 use crate::native_interop::{
     self, TIMER_CLOCK, TIMER_COUNTDOWN, TIMER_MOUSE_CLICK, TIMER_POLL, TIMER_RESET_POLL,
-    TIMER_TRAY_HOVER, TIMER_UPDATE_CHECK, TIMER_WINDOW_STATE, WM_APP_OPEN_DASHBOARD, WM_APP_QUIT,
-    WM_APP_REFRESH_NOW, WM_APP_SETTINGS_UPDATED, WM_APP_TRAY, WM_APP_USAGE_UPDATED,
+    TIMER_TRAY_HOVER, TIMER_TRAY_REPOSITION, TIMER_UPDATE_CHECK, TIMER_WINDOW_STATE,
+    WM_APP_DISABLE_DIAGNOSTICS, WM_APP_ENABLE_DIAGNOSTICS, WM_APP_OPEN_DASHBOARD, WM_APP_QUIT,
+    WM_APP_REFRESH_NOW, WM_APP_SETTINGS_UPDATED, WM_APP_TASKBAR_COLLISION, WM_APP_TRAY,
+    WM_APP_USAGE_UPDATED,
 };
 use crate::poller;
 use crate::providers::{ProviderId, ProviderSet};
@@ -93,6 +94,7 @@ struct AppState {
     install_channel: InstallChannel,
 
     providers: ProviderSet,
+    accounts: crate::accounts::AccountSettings,
 
     data: Option<AppUsageData>,
 
@@ -103,19 +105,25 @@ struct AppState {
     auth_watch_mode: poller::CredentialWatchMode,
     auth_watch_snapshot: poller::CredentialWatchSnapshot,
     last_poll_ok: bool,
+    last_poll_failure: Option<poller::PollFailure>,
     update_status: UpdateStatus,
     last_update_check_unix: Option<u64>,
 
     taskbar_index: usize,
     tray_offset: i32,
     dragging: bool,
-    drag_start_mouse_x: i32,
+    pending_drag: bool,
+    drag_start_cursor: POINT,
+    drag_start_origin: POINT,
     drag_start_client_x: i32,
-    drag_start_offset: i32,
-    /// Horizontal placement the user dragged a themed surface to, overriding
-    /// the theme's own offset so read-only built-in themes stay movable.
-    theme_offset_x: Option<i32>,
-    theme_drag: Option<ThemeDrag>,
+    auto_ejected: bool,
+    auto_ejected_origin: Option<POINT>,
+    auto_ejected_host: Option<app_settings::FloatingHost>,
+    is_switching_window_style: bool,
+    is_snapped: bool,
+    placement_override: Option<PlacementOverride>,
+    floating_card_opacity: Option<u8>,
+    window_state_timer_active: bool,
 
     custom_theme_enabled: bool,
     usage_countdown: bool,
@@ -131,16 +139,6 @@ struct AppState {
     suppress_next_left_up: bool,
 }
 
-/// A left-button press on a themed surface that may become a horizontal drag.
-/// The press only turns into a drag once the pointer passes a small threshold,
-/// so ordinary clicks still reach the theme's own mouse actions.
-#[derive(Clone, Debug)]
-struct ThemeDrag {
-    start_mouse_x: i32,
-    start_offset_x: i32,
-    moved: bool,
-}
-
 #[derive(Clone, Debug)]
 struct PendingMouseClick {
     surface_index: usize,
@@ -154,6 +152,46 @@ enum UpdateStatus {
     Applying,
     UpToDate,
     Available(ReleaseDescriptor),
+}
+
+fn publish_update_status(state: &AppState) {
+    use crate::dashboard::UpdateStatus as DashboardStatus;
+    let status = match &state.update_status {
+        UpdateStatus::Idle | UpdateStatus::UpToDate => DashboardStatus::Idle,
+        UpdateStatus::Checking => DashboardStatus::Checking,
+        UpdateStatus::Applying => DashboardStatus::Applying,
+        UpdateStatus::Available(release) => {
+            DashboardStatus::Available(release.latest_version.clone())
+        }
+    };
+    crate::dashboard::publish_update_status(state.hwnd.to_hwnd(), status);
+}
+
+fn perform_update_action(hwnd: HWND) {
+    let (install_channel, release) = {
+        let state = lock_state();
+        let Some(state) = state.as_ref() else {
+            return;
+        };
+        if matches!(
+            state.update_status,
+            UpdateStatus::Checking | UpdateStatus::Applying
+        ) {
+            return;
+        }
+        (
+            state.install_channel,
+            match &state.update_status {
+                UpdateStatus::Available(release) => Some(release.clone()),
+                _ => None,
+            },
+        )
+    };
+    match (install_channel, release) {
+        (InstallChannel::Portable, Some(release)) => begin_update_apply(hwnd, release),
+        (InstallChannel::Winget, Some(_)) => begin_winget_update(hwnd),
+        (_, None) => begin_update_check(hwnd, true),
+    }
 }
 
 const RETRY_BASE_MS: u32 = 30_000; // 30 seconds
@@ -187,23 +225,8 @@ fn language_from_menu_command_id(command: u16) -> Option<LanguageId> {
 }
 
 fn open_web_url(hwnd: HWND, url: &str, failure_message: &'static str) {
-    if !context_menu::supported_url(url) {
-        return;
-    }
-    unsafe {
-        let operation = native_interop::wide_str("open");
-        let url = native_interop::wide_str(url.trim());
-        let result = ShellExecuteW(
-            Some(hwnd),
-            PCWSTR::from_raw(operation.as_ptr()),
-            PCWSTR::from_raw(url.as_ptr()),
-            PCWSTR::null(),
-            PCWSTR::null(),
-            SW_SHOWNORMAL,
-        );
-        if result.0 as isize <= 32 {
-            diagnose::log(failure_message);
-        }
+    if !native_interop::open_web_url(Some(hwnd), url) {
+        diagnose::log(failure_message);
     }
 }
 
@@ -425,17 +448,19 @@ fn spawn_taskbar_watchdog() {
             let Some(state) = state.as_ref() else {
                 continue;
             };
-            let shell_hosted = state.active_theme.as_ref().is_some_and(|theme| {
-                theme.surfaces.iter().any(|surface| {
-                    matches!(
-                        surface
-                            .placement
-                            .nest
-                            .resolve(surface.placement.reference.region),
-                        SurfaceNest::Taskbar | SurfaceNest::Desktop
-                    )
-                })
-            });
+            let shell_hosted = theme_with_placement(state, false)
+                .as_ref()
+                .is_some_and(|theme| {
+                    theme.surfaces.iter().any(|surface| {
+                        matches!(
+                            surface
+                                .placement
+                                .nest
+                                .resolve(surface.placement.reference.region),
+                            SurfaceNest::Taskbar | SurfaceNest::Desktop
+                        )
+                    })
+                });
             if !shell_hosted {
                 continue;
             }
@@ -460,7 +485,77 @@ fn spawn_taskbar_watchdog() {
             diagnose::log("watchdog: shell-hosted surface was destroyed -> relaunching");
             relaunch_self();
         }
+
+        static LAST_WATCHDOG_TRAY_RECT: Mutex<Option<RECT>> = Mutex::new(None);
+        let (reposition_target, current_tray_rect) = {
+            let state = lock_state();
+            if let Some(s) = state.as_ref() {
+                let tray_hwnd = s.tray_notify_hwnd.map(|h| h.to_hwnd());
+                let target_hwnd = s.hwnd.to_hwnd();
+                (
+                    target_hwnd,
+                    tray_hwnd.and_then(native_interop::get_window_rect_safe),
+                )
+            } else {
+                (HWND::default(), None)
+            }
+        };
+        if !reposition_target.is_invalid() && current_tray_rect.is_some() {
+            let mut last_rect = LAST_WATCHDOG_TRAY_RECT
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if rect_changed(*last_rect, current_tray_rect) {
+                *last_rect = current_tray_rect;
+                unsafe {
+                    let _ = PostMessageW(
+                        Some(reposition_target),
+                        native_interop::WM_APP_TRAY_REPOSITION,
+                        WPARAM(0),
+                        LPARAM(0),
+                    );
+                }
+            }
+        }
+
+        let collision_action = lock_state().as_ref().and_then(|state| {
+            taskbar_collision_action(state).map(|action| (state.hwnd.to_hwnd(), action))
+        });
+
+        if let Some((target_hwnd, action)) = collision_action {
+            unsafe {
+                let _ = PostMessageW(
+                    Some(target_hwnd),
+                    native_interop::WM_APP_TASKBAR_COLLISION,
+                    WPARAM(action),
+                    LPARAM(0),
+                );
+            }
+        }
     });
+}
+
+fn taskbar_collision_action(state: &AppState) -> Option<usize> {
+    if state.dragging || state.pending_drag || state.is_switching_window_style {
+        return None;
+    }
+    let taskbar = state.taskbar_hwnd?.to_hwnd();
+    let bounds = native_interop::get_taskbar_rect(taskbar)?;
+    let occupancy = taskbar_collision::cached(taskbar, bounds)?;
+    if state.auto_ejected {
+        let target = restored_dock_rect(state, taskbar, bounds)?;
+        let margin = (20.0 * CURRENT_DPI.load(Ordering::Relaxed) as f64 / 96.0).round() as i32;
+        occupancy.can_restore(target, margin).then_some(0)
+    } else if state.embedded
+        && state
+            .placement_override
+            .as_ref()
+            .is_none_or(|p| p.nest != "floating")
+    {
+        let widget = native_interop::get_window_rect_safe(state.hwnd.to_hwnd())?;
+        occupancy.overlaps(widget).then_some(1)
+    } else {
+        None
+    }
 }
 
 static STATE: Mutex<Option<AppState>> = Mutex::new(None);
@@ -477,10 +572,24 @@ fn theme_runtime_from_state(state: &AppState) -> ThemeRuntime {
         state.auth_error_paused_polling,
         state.data.as_ref(),
     );
+    let nest = if state.auto_ejected {
+        SurfaceNest::Floating
+    } else if let Some(ref ov) = state.placement_override {
+        if ov.nest == "floating" {
+            SurfaceNest::Floating
+        } else {
+            SurfaceNest::Taskbar
+        }
+    } else {
+        SurfaceNest::Taskbar
+    };
+    let opacity = state.floating_card_opacity.unwrap_or(85);
     ThemeRuntime::from_providers(state.providers)
         .with_poll_state(poll_ok, has_error)
         .with_language(state.language)
         .with_countdown(state.usage_countdown)
+        .with_nest(nest)
+        .with_floating_card_opacity(opacity)
 }
 
 /// A transient outage can keep presenting the last real reading while its
@@ -492,6 +601,13 @@ fn poll_display_state(
     auth_error_paused_polling: bool,
     data: Option<&AppUsageData>,
 ) -> (bool, bool) {
+    if let Some(data) = data.filter(|data| !data.accounts.is_empty()) {
+        let has_error = data.accounts.iter().any(|account| account.error.is_some());
+        return (
+            !data.is_empty(),
+            data.is_empty() && (has_error || retry_count > 0),
+        );
+    }
     let has_usable_stale_data = !auth_error_paused_polling
         && data.is_some_and(|data| data.iter().any(|(_, usage)| usage.stale));
     (
@@ -501,9 +617,121 @@ fn poll_display_state(
 }
 
 fn effective_theme_from_state(state: &AppState) -> Option<ThemeDocument> {
-    state.active_theme.as_ref().map(|theme| {
+    theme_with_placement(state, state.auto_ejected)
+}
+
+fn theme_with_placement(state: &AppState, auto_ejected: bool) -> Option<ThemeDocument> {
+    let mut theme = state.active_theme.as_ref().map(|theme| {
         theme_engine::apply_mouse_action_overrides(theme, &state.mouse_action_overrides)
-    })
+    })?;
+    let floating = if auto_ejected {
+        state.auto_ejected_origin.map(|point| (None, point))
+    } else {
+        state
+            .placement_override
+            .as_ref()
+            .filter(|p| p.nest == "floating")
+            .map(|p| {
+                (
+                    Some(p.monitor_index),
+                    POINT {
+                        x: p.screen_x,
+                        y: p.screen_y,
+                    },
+                )
+            })
+    };
+    if let Some((saved_monitor, point)) = floating {
+        let displays = native_interop::find_monitors();
+        let selected = saved_monitor
+            .and_then(|index| displays.get(index).copied().map(|d| (index, d)))
+            .unwrap_or_else(|| positioning::monitor_for_point(&displays, point));
+        apply_floating_position(&mut theme, state, selected.0, selected.1, point);
+    } else if let Some(p) = state
+        .placement_override
+        .as_ref()
+        .filter(|p| p.nest == "taskbar")
+    {
+        let displays = native_interop::find_monitors();
+        let index = if p.monitor_index < displays.len() {
+            p.monitor_index
+        } else {
+            0
+        };
+        let horizontal = taskbar_is_horizontal(index);
+        let placement =
+            positioning::dock_placement(index, p.tray_offset, display_scale(index), horizontal);
+        positioning::override_primary_placement(&mut theme, placement);
+    }
+    Some(theme)
+}
+
+fn apply_floating_position(
+    theme: &mut ThemeDocument,
+    state: &AppState,
+    index: usize,
+    display: native_interop::DisplayMonitor,
+    point: POINT,
+) {
+    let mut placement = positioning::floating_placement(index);
+    let saved_host = if state.auto_ejected {
+        state.auto_ejected_host.as_ref()
+    } else {
+        state
+            .placement_override
+            .as_ref()
+            .and_then(|p| p.floating_host.as_ref())
+    };
+    placement.host_dimensions =
+        floating_host_for_theme(theme, saved_host).map(|host| (host.width, host.height));
+    positioning::override_primary_placement(theme, placement.clone());
+    let scale = monitor_scale(display);
+    let runtime = theme_runtime_for_surface(theme, 0, theme_runtime_from_state(state));
+    let frame = positioning::widget_frame(theme, state.data.as_ref(), runtime, scale);
+    let offset = positioning::clamped_floating_offset(point, display.rect, &frame, scale);
+    placement.offset_x = offset.x;
+    placement.offset_y = offset.y;
+    positioning::override_primary_placement(theme, placement);
+}
+
+/// Resolve the actual rectangle that will be restored, including authored
+/// placement or a saved drag offset. The watchdog must test this same target.
+fn restored_dock_rect(state: &AppState, taskbar: HWND, taskbar_rect: RECT) -> Option<RECT> {
+    let theme = theme_with_placement(state, false)?;
+    let surface = theme.surfaces.first()?;
+    if surface
+        .placement
+        .nest
+        .resolve(surface.placement.reference.region)
+        != SurfaceNest::Taskbar
+    {
+        return None;
+    }
+    let displays = native_interop::find_monitors();
+    let display = displays
+        .get(surface.placement.reference.display)
+        .or_else(|| displays.first())?;
+    if unsafe { MonitorFromWindow(taskbar, MONITOR_DEFAULTTOPRIMARY) } != display.handle {
+        return None;
+    }
+    let runtime = theme_runtime_for_surface(&theme, 0, theme_runtime_from_state(state));
+    let scale = monitor_scale(*display);
+    let frame = positioning::widget_frame(&theme, state.data.as_ref(), runtime, scale);
+    let offsets = theme_engine::resolve_surface_placement(&theme, 0, state.data.as_ref(), runtime);
+    let mut placement = surface.placement.clone();
+    placement.offset_x = offsets.offset_x;
+    placement.offset_y = offsets.offset_y;
+    let tray = native_interop::find_child_window(taskbar, "TrayNotifyWnd")
+        .and_then(native_interop::get_window_rect_safe);
+    Some(positioning::surface_screen_rect(
+        &placement,
+        frame.width,
+        frame.height,
+        scale,
+        display.rect,
+        Some(taskbar_rect),
+        tray,
+    ))
 }
 
 fn theme_has_floating_surface(theme: &ThemeDocument) -> bool {
@@ -516,17 +744,31 @@ fn theme_has_floating_surface(theme: &ThemeDocument) -> bool {
     })
 }
 
+fn window_state_timer_required(state: &AppState) -> bool {
+    state.custom_theme_enabled
+        && effective_theme_from_state(state)
+            .as_ref()
+            .is_some_and(theme_has_floating_surface)
+}
+
 fn sync_window_state_timer(hwnd: HWND) {
-    let required = {
-        let state = lock_state();
-        state.as_ref().is_some_and(|state| {
-            state.custom_theme_enabled
-                && state
-                    .active_theme
-                    .as_ref()
-                    .is_some_and(theme_has_floating_surface)
-        })
-    };
+    let required = lock_state()
+        .as_ref()
+        .is_some_and(window_state_timer_required);
+    set_window_state_timer(hwnd, required);
+}
+
+fn set_window_state_timer(hwnd: HWND, required: bool) {
+    {
+        let mut state = lock_state();
+        let Some(state) = state.as_mut() else {
+            return;
+        };
+        if required == state.window_state_timer_active {
+            return;
+        }
+        state.window_state_timer_active = required;
+    }
     unsafe {
         if required {
             SetTimer(
@@ -561,7 +803,8 @@ fn save_state_settings() {
             .active_theme_path
             .as_ref()
             .map(|path| path.to_string_lossy().to_string());
-        persisted.theme_offset_x = s.theme_offset_x;
+        persisted.placement_override = s.placement_override.clone();
+        persisted.floating_card_opacity = s.floating_card_opacity;
         // The dashboard process owns its dimensions, so leave the freshly
         // loaded values unchanged when monitor actions persist settings.
         if let Err(error) = save_settings(&persisted) {
@@ -617,7 +860,10 @@ fn tray_usage_summary_lines(
                 .unwrap_or(strings.weekly_window);
             Some(format!(
                 "{} {}: {:.0}%{} | {}: {:.0}%{}",
-                language.text(descriptor.display_name),
+                match data.selected_account_name(provider) {
+                    Some(name) => format!("{} ({name})", language.text(descriptor.display_name)),
+                    None => language.text(descriptor.display_name).to_string(),
+                },
                 strings.session_window,
                 shown(usage.session.percentage),
                 tray_reset_clock(&usage.session, language),
@@ -632,6 +878,15 @@ fn tray_usage_summary_lines(
 fn tray_usage_summary_from_state() -> Option<String> {
     let state = lock_state();
     let state = state.as_ref()?;
+    let errors = tray_error_lines(
+        state.data.as_ref(),
+        state.last_poll_failure,
+        state.providers,
+        state.language,
+    );
+    if !errors.is_empty() {
+        return Some(errors.join("\n"));
+    }
     if !state.last_poll_ok {
         return None;
     }
@@ -642,6 +897,50 @@ fn tray_usage_summary_from_state() -> Option<String> {
         state.usage_countdown,
     );
     (!lines.is_empty()).then(|| lines.join("\n"))
+}
+
+fn tray_error_lines(
+    data: Option<&AppUsageData>,
+    failure: Option<poller::PollFailure>,
+    providers: ProviderSet,
+    language: LanguageId,
+) -> Vec<String> {
+    let mut accounts: Vec<_> = data
+        .into_iter()
+        .flat_map(|data| &data.accounts)
+        .filter(|account| {
+            providers.contains(account.provider)
+                && account.profile.enabled
+                && account.error.is_some()
+        })
+        .collect();
+    // Windows truncates tray tooltips: put the selected account's error first.
+    accounts.sort_by_key(|account| !account.selected);
+    let mut lines: Vec<_> = accounts
+        .into_iter()
+        .map(|account| {
+            format!(
+                "{} ({}): {}",
+                language.text(account.provider.descriptor().display_name),
+                account.profile.name,
+                account.error.unwrap().message(language),
+            )
+        })
+        .collect();
+    if let Some(failure) = failure.filter(|failure| providers.contains(failure.provider)) {
+        if !data.is_some_and(|data| {
+            data.accounts
+                .iter()
+                .any(|account| account.provider == failure.provider && account.error.is_some())
+        }) {
+            lines.push(format!(
+                "{}: {}",
+                language.text(failure.provider.descriptor().display_name),
+                failure.error.message(language)
+            ));
+        }
+    }
+    lines
 }
 
 fn tray_icon_tooltip_from_state() -> String {
@@ -762,103 +1061,6 @@ fn taskbar_created_message() -> u32 {
         let name = native_interop::wide_str("TaskbarCreated");
         RegisterWindowMessageW(PCWSTR::from_raw(name.as_ptr()))
     })
-}
-
-fn attach_to_taskbar(hwnd: HWND, requested_index: usize) -> bool {
-    let taskbars = native_interop::find_taskbars();
-    if taskbars.is_empty() {
-        diagnose::log("taskbar not found; using fallback popup window");
-        return false;
-    }
-
-    let index = requested_index.min(taskbars.len().saturating_sub(1));
-    let taskbar = taskbars[index];
-    diagnose::log(format!(
-        "taskbar selected index={index} count={} hwnd={:?} rect=({}, {}, {}, {})",
-        taskbars.len(),
-        taskbar.hwnd,
-        taskbar.rect.left,
-        taskbar.rect.top,
-        taskbar.rect.right,
-        taskbar.rect.bottom
-    ));
-
-    let old_hook = {
-        let mut state = lock_state();
-        state.as_mut().and_then(|s| s.win_event_hook.take())
-    };
-    if let Some(hook) = old_hook {
-        native_interop::unhook_win_event(hook.to_hook());
-    }
-
-    native_interop::embed_in_taskbar(hwnd, taskbar.hwnd);
-
-    let tray_notify = native_interop::find_child_window(taskbar.hwnd, "TrayNotifyWnd");
-    if tray_notify.is_some() {
-        diagnose::log("TrayNotifyWnd found");
-    } else {
-        diagnose::log("TrayNotifyWnd not found");
-    }
-
-    let hook = tray_notify.and_then(|tray_hwnd| {
-        let thread_id = native_interop::get_window_thread_id(tray_hwnd);
-        native_interop::set_tray_event_hook(thread_id, on_tray_location_changed)
-    });
-    if hook.is_some() {
-        diagnose::log("tray event hook installed");
-    } else {
-        diagnose::log("tray event hook could not be installed");
-    }
-
-    let mut state = lock_state();
-    if let Some(s) = state.as_mut() {
-        s.taskbar_hwnd = Some(SendHwnd::from_hwnd(taskbar.hwnd));
-        s.tray_notify_hwnd = tray_notify.map(SendHwnd::from_hwnd);
-        s.win_event_hook = hook.map(SendWinEventHook::from_hook);
-        s.taskbar_index = index;
-        s.embedded = true;
-    }
-    true
-}
-
-fn taskbar_at_point(pt: POINT) -> Option<(usize, native_interop::TaskbarWindow)> {
-    native_interop::find_taskbars()
-        .into_iter()
-        .enumerate()
-        .find(|(_, taskbar)| {
-            pt.x >= taskbar.rect.left
-                && pt.x < taskbar.rect.right
-                && pt.y >= taskbar.rect.top
-                && pt.y < taskbar.rect.bottom
-        })
-}
-
-fn tray_left_for_taskbar(taskbar_hwnd: HWND, taskbar_rect: RECT) -> i32 {
-    let mut tray_left = taskbar_rect.right;
-    if let Some(tray_hwnd) = native_interop::find_child_window(taskbar_hwnd, "TrayNotifyWnd") {
-        if let Some(tray_rect) = native_interop::get_window_rect_safe(tray_hwnd) {
-            tray_left = tray_rect.left;
-        }
-    }
-    tray_left
-}
-
-fn clamp_offset_for_taskbar(taskbar_hwnd: HWND, taskbar_rect: RECT, offset: i32) -> i32 {
-    let tray_left = tray_left_for_taskbar(taskbar_hwnd, taskbar_rect);
-    let max_offset = (tray_left - taskbar_rect.left - total_widget_width()).max(0);
-    offset.clamp(0, max_offset)
-}
-
-fn offset_for_drop_point(
-    taskbar_hwnd: HWND,
-    taskbar_rect: RECT,
-    pt: POINT,
-    drag_start_client_x: i32,
-) -> i32 {
-    let tray_left = tray_left_for_taskbar(taskbar_hwnd, taskbar_rect);
-    let desired_left = pt.x - taskbar_rect.left - drag_start_client_x;
-    let offset = tray_left - taskbar_rect.left - total_widget_width() - desired_left;
-    clamp_offset_for_taskbar(taskbar_hwnd, taskbar_rect, offset)
 }
 
 fn now_unix_secs() -> u64 {
@@ -1002,6 +1204,7 @@ fn begin_update_check(hwnd: HWND, interactive: bool) {
         }
 
         app_state.update_status = UpdateStatus::Checking;
+        publish_update_status(app_state);
         (app_state.language.strings(), app_state.install_channel)
     };
 
@@ -1015,6 +1218,7 @@ fn begin_update_check(hwnd: HWND, interactive: bool) {
                     if let Some(s) = state.as_mut() {
                         s.update_status = UpdateStatus::UpToDate;
                         s.last_update_check_unix = Some(checked_at);
+                        publish_update_status(s);
                     }
                 }
                 save_state_settings();
@@ -1045,6 +1249,10 @@ fn begin_update_check(hwnd: HWND, interactive: bool) {
                         InstallChannel::Winget => begin_winget_update(hwnd),
                     }
                 }
+                // Keep the dashboard busy until the install prompt is dismissed.
+                if let Some(state) = lock_state().as_ref() {
+                    publish_update_status(state);
+                }
                 unsafe {
                     let _ = PostMessageW(
                         Some(hwnd),
@@ -1060,6 +1268,7 @@ fn begin_update_check(hwnd: HWND, interactive: bool) {
                     if let Some(s) = state.as_mut() {
                         s.update_status = UpdateStatus::Idle;
                         s.last_update_check_unix = Some(checked_at);
+                        publish_update_status(s);
                     }
                 }
                 save_state_settings();
@@ -1101,6 +1310,7 @@ fn begin_update_apply(hwnd: HWND, release: ReleaseDescriptor) {
         }
 
         app_state.update_status = UpdateStatus::Applying;
+        publish_update_status(app_state);
         app_state.language.strings()
     };
 
@@ -1115,6 +1325,7 @@ fn begin_update_apply(hwnd: HWND, release: ReleaseDescriptor) {
                     let mut state = lock_state();
                     if let Some(s) = state.as_mut() {
                         s.update_status = UpdateStatus::Available(release);
+                        publish_update_status(s);
                     }
                 }
                 let message = format!("{}.\n\n{}", strings.update_failed, error);
@@ -1133,17 +1344,31 @@ fn begin_update_apply(hwnd: HWND, release: ReleaseDescriptor) {
 }
 
 fn begin_winget_update(hwnd: HWND) {
-    let strings = {
-        let state = lock_state();
-        state.as_ref().map(|s| s.language.strings())
-    }
-    .unwrap_or(LanguageId::English.strings());
+    let (strings, previous_status) = {
+        let mut state = lock_state();
+        let Some(state) = state.as_mut() else {
+            return;
+        };
+        if matches!(
+            state.update_status,
+            UpdateStatus::Checking | UpdateStatus::Applying
+        ) {
+            return;
+        }
+        let previous_status = std::mem::replace(&mut state.update_status, UpdateStatus::Applying);
+        publish_update_status(state);
+        (state.language.strings(), previous_status)
+    };
 
     match updater::begin_winget_update() {
         Ok(()) => unsafe {
             let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
         },
         Err(error) => {
+            if let Some(state) = lock_state().as_mut() {
+                state.update_status = previous_status;
+                publish_update_status(state);
+            }
             let message = format!("{}.\n\n{}", strings.update_failed, error);
             show_error_message(hwnd, strings.updates, &message);
         }
@@ -1265,12 +1490,48 @@ pub(crate) fn set_startup_enabled(enable: bool) {
 }
 
 fn total_widget_width_for_state(state: &AppState) -> i32 {
-    effective_theme_from_state(state)
-        .as_ref()
-        .map_or(1, |theme| {
+    widget_frame_for_state(state, None).width
+}
+
+fn widget_frame_for_state(state: &AppState, nest: Option<SurfaceNest>) -> positioning::WidgetFrame {
+    effective_theme_from_state(state).as_ref().map_or(
+        positioning::WidgetFrame {
+            width: 1,
+            height: 1,
+            content_width: 1,
+            inset: 0,
+        },
+        |theme| {
             let runtime = theme_runtime_for_surface(theme, 0, theme_runtime_from_state(state));
-            theme_engine::resolve_surface_size(theme, 0, state.data.as_ref(), runtime).0 as i32
-        })
+            let mut runtime = nest.map_or(runtime, |nest| runtime.with_nest(nest));
+            if nest == Some(SurfaceNest::Floating) {
+                if let Some(host) = floating_host_for_theme(theme, None) {
+                    runtime = runtime.with_host_dimensions(host.width, host.height);
+                }
+            }
+            let scale = theme_surface_scale(theme, 0);
+            positioning::widget_frame(theme, state.data.as_ref(), runtime, scale)
+        },
+    )
+}
+
+fn floating_frame_for_state(
+    state: &AppState,
+    display_index: usize,
+    scale: f64,
+) -> Option<positioning::WidgetFrame> {
+    let mut theme = effective_theme_from_state(state)?;
+    let mut placement = positioning::floating_placement(display_index);
+    placement.host_dimensions =
+        floating_host_for_theme(&theme, None).map(|host| (host.width, host.height));
+    positioning::override_primary_placement(&mut theme, placement);
+    let runtime = theme_runtime_for_surface(&theme, 0, theme_runtime_from_state(state));
+    Some(positioning::widget_frame(
+        &theme,
+        state.data.as_ref(),
+        runtime,
+        scale,
+    ))
 }
 
 fn apply_custom_theme(
@@ -1313,7 +1574,7 @@ fn apply_custom_theme(
     }
     unsafe {
         native_interop::make_popup(hwnd, false);
-        reset_layered_window(hwnd);
+        ensure_layered_window(hwnd);
         let _ = SetWindowPos(
             hwnd,
             Some(HWND_NOTOPMOST),
@@ -1586,12 +1847,7 @@ unsafe extern "system" fn mirror_wnd_proc(
 }
 
 fn total_widget_height_for_state(state: &AppState) -> i32 {
-    effective_theme_from_state(state)
-        .as_ref()
-        .map_or(1, |theme| {
-            let runtime = theme_runtime_for_surface(theme, 0, theme_runtime_from_state(state));
-            theme_engine::resolve_surface_size(theme, 0, state.data.as_ref(), runtime).1 as i32
-        })
+    widget_frame_for_state(state, None).height
 }
 
 fn total_widget_height() -> i32 {
@@ -1845,6 +2101,7 @@ pub fn run() {
                 language,
                 install_channel,
                 providers: settings.enabled_providers(),
+                accounts: settings.accounts.clone(),
                 data: None,
                 poll_interval_ms: settings.poll_interval_ms,
                 retry_count: 0,
@@ -1855,16 +2112,24 @@ pub fn run() {
                 ),
                 auth_watch_snapshot: Vec::new(),
                 last_poll_ok: false,
+                last_poll_failure: None,
                 update_status: UpdateStatus::Idle,
                 last_update_check_unix: settings.last_update_check_unix,
                 taskbar_index: settings.taskbar_index,
                 tray_offset: settings.tray_offset,
                 dragging: false,
-                drag_start_mouse_x: 0,
+                pending_drag: false,
+                drag_start_cursor: POINT::default(),
+                drag_start_origin: POINT::default(),
                 drag_start_client_x: 0,
-                drag_start_offset: 0,
-                theme_offset_x: settings.theme_offset_x,
-                theme_drag: None,
+                auto_ejected: false,
+                auto_ejected_origin: None,
+                auto_ejected_host: None,
+                is_switching_window_style: false,
+                is_snapped: false,
+                placement_override: settings.placement_override.clone(),
+                floating_card_opacity: settings.floating_card_opacity,
+                window_state_timer_active: false,
                 custom_theme_enabled,
                 usage_countdown: settings.usage_countdown,
                 active_theme_path,
@@ -1880,6 +2145,9 @@ pub fn run() {
             });
         }
 
+        if let Some(state) = lock_state().as_ref() {
+            publish_update_status(state);
+        }
         if let Err(error) = crate::dashboard::start_request_listener(hwnd) {
             diagnose::log_error("dashboard request listener failed", error);
         }
@@ -1921,6 +2189,7 @@ pub fn run() {
         // runs on a dedicated thread, NOT a window timer: once explorer destroys
         // the taskbar, our embedded child window stops receiving all messages
         // (WM_TIMER included), so a timer would never fire again.
+        taskbar_collision::spawn_reader();
         spawn_taskbar_watchdog();
 
         // Initial poll
@@ -1979,6 +2248,7 @@ fn render_layered() {
     // install Classic in memory when a selected theme cannot be loaded.
     let theme = active_theme.unwrap_or_else(ThemeDocument::starter);
     let hwnd = hwnd_val.to_hwnd();
+    set_window_state_timer(hwnd, theme_has_floating_surface(&theme));
     let target_count = theme.surfaces.len();
     for surface_index in 0..target_count {
         let regular_hwnd = if surface_index == 0 {
@@ -2106,29 +2376,48 @@ fn request_poll_inner(hwnd: HWND, queue_if_busy: bool) {
     {
         if queue_if_busy {
             POLL_PENDING.store(true, Ordering::Release);
+            diagnose::log("poll already running; manual refresh queued");
         }
         return;
     }
     let send_hwnd = SendHwnd::from_hwnd(hwnd);
-    std::thread::spawn(move || poll_worker(send_hwnd));
+    std::thread::spawn(move || poll_worker(send_hwnd, !queue_if_busy));
 }
 
-fn poll_worker(send_hwnd: SendHwnd) {
+/// Run credential watching under the same in-flight guard as usage polling.
+/// Timer ticks cannot pile up workers, and manual refreshes still queue behind
+/// a slow credential scan. Credential changes do not synthesize manual actions.
+fn poll_worker(send_hwnd: SendHwnd, scheduled: bool) {
+    run_poll_worker(&POLL_IN_FLIGHT, &POLL_PENDING, scheduled, |scheduled| {
+        if !scheduled || scheduled_poll_needed() {
+            do_poll_once(send_hwnd.to_hwnd());
+        }
+    });
+}
+
+fn run_poll_worker(
+    in_flight: &AtomicBool,
+    pending: &AtomicBool,
+    mut scheduled: bool,
+    mut poll: impl FnMut(bool),
+) {
     loop {
-        do_poll_once(send_hwnd.to_hwnd());
-        if POLL_PENDING.swap(false, Ordering::AcqRel) {
+        poll(scheduled);
+        // Any queued request is an explicit refresh, not another timer tick.
+        scheduled = false;
+        if pending.swap(false, Ordering::AcqRel) {
             continue;
         }
 
-        POLL_IN_FLIGHT.store(false, Ordering::Release);
-        if !POLL_PENDING.swap(false, Ordering::AcqRel) {
+        in_flight.store(false, Ordering::Release);
+        if !pending.swap(false, Ordering::AcqRel) {
             break;
         }
 
         // A request can arrive between the pending check and releasing the
         // in-flight flag. Reacquire ownership unless that request already
         // started a replacement worker.
-        if POLL_IN_FLIGHT
+        if in_flight
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_err()
         {
@@ -2137,22 +2426,110 @@ fn poll_worker(send_hwnd: SendHwnd) {
     }
 }
 
-fn do_poll_once(hwnd: HWND) {
-    let enabled_providers = {
+fn scheduled_poll_needed() -> bool {
+    let watch = {
         let state = lock_state();
+        let Some(state) = state.as_ref() else {
+            return false;
+        };
+        if !state.auth_error_paused_polling {
+            return true;
+        }
+        (
+            state.auth_watch_mode,
+            state.auth_watch_snapshot.clone(),
+            state.providers,
+            state.accounts.clone(),
+        )
+    };
+    // No STATE lock is held while reading files, credentials, or WSL.
+    let current = poller::credential_watch_snapshot(watch.0);
+    current != watch.1
+        && lock_state().as_ref().is_some_and(|state| {
+            state.auth_error_paused_polling
+                && state.auth_watch_mode == watch.0
+                && state.auth_watch_snapshot == watch.1
+                && state.providers == watch.2
+                && state.accounts == watch.3
+        })
+}
+
+fn do_poll_once(hwnd: HWND) {
+    let poll_started = Instant::now();
+    let (enabled_providers, accounts, previous, force) = {
+        let mut state = lock_state();
         state
-            .as_ref()
-            .map(|state| state.providers)
+            .as_mut()
+            .map(|state| {
+                (
+                    state.providers,
+                    state.accounts.clone(),
+                    state.data.clone(),
+                    std::mem::take(&mut state.force_notify_auth_error),
+                )
+            })
             .unwrap_or_default()
     };
 
-    match poller::poll(enabled_providers) {
+    diagnose::log_lazy(|| format!("poll started providers={enabled_providers:?} force={force}"));
+    let result = poller::poll(
+        enabled_providers,
+        &accounts,
+        previous.as_ref(),
+        force,
+        |update| {
+            let cache_data = {
+                let mut state = lock_state();
+                let Some(state) = state.as_mut() else {
+                    return;
+                };
+                // A result from an old provider/account selection must not be shown.
+                if state.providers != enabled_providers || state.accounts != accounts {
+                    return;
+                }
+                let data = poller::merge_poll_progress(
+                    update,
+                    &state.data.clone().unwrap_or_default(),
+                    &accounts,
+                );
+                state.data = Some(data.clone());
+                state.last_poll_ok = true;
+                state.last_poll_failure = None;
+                data
+            };
+            // The dashboard runs separately and follows the same cache as the
+            // widget. Publish before waiting for slower providers to finish.
+            if let Err(error) = app_settings::save_usage_cache(&cache_data, true) {
+                diagnose::log_error("unable to save partial usage cache", error);
+            }
+            unsafe {
+                let _ = PostMessageW(Some(hwnd), WM_APP_USAGE_UPDATED, WPARAM(0), LPARAM(0));
+            }
+        },
+    );
+    match result {
         Ok(data) => {
             let mut state = lock_state();
-            let data = match state.as_ref().and_then(|s| s.data.as_ref()) {
+            if state
+                .as_ref()
+                .is_some_and(|s| s.providers != enabled_providers || s.accounts != accounts)
+            {
+                return;
+            }
+            let mut data = match state.as_ref().and_then(|s| s.data.as_ref()) {
                 Some(previous) => poller::carry_forward_failures(data, previous, enabled_providers),
                 None => data,
             };
+            data.select_accounts(&accounts);
+            let notifications: Vec<_> = data
+                .new_auth_failures(previous.as_ref(), force)
+                .into_iter()
+                .map(|account| (account.provider, account.profile.name.clone()))
+                .collect();
+            let language = state
+                .as_ref()
+                .map(|state| state.language)
+                .unwrap_or(LanguageId::English);
             let cache_data = data.clone();
             if let Some(s) = state.as_mut() {
                 // Stop fast-poll if reset data is now fresh
@@ -2164,6 +2541,7 @@ fn do_poll_once(hwnd: HWND) {
 
                 s.data = Some(data);
                 s.last_poll_ok = true;
+                s.last_poll_failure = None;
 
                 // Recovered from errors — restore normal poll interval
                 if s.retry_count > 0 {
@@ -2173,7 +2551,6 @@ fn do_poll_once(hwnd: HWND) {
                         SetTimer(Some(hwnd), TIMER_POLL, interval, None);
                     }
                 }
-                s.force_notify_auth_error = false;
                 s.auth_error_paused_polling = false;
                 s.auth_watch_mode = poller::CredentialWatchMode::ActiveSource(
                     s.providers.first().unwrap_or_default(),
@@ -2181,15 +2558,52 @@ fn do_poll_once(hwnd: HWND) {
                 s.auth_watch_snapshot.clear();
             }
             drop(state);
-            let _ = app_settings::save_usage_cache(&cache_data, true);
+            match app_settings::save_usage_cache(&cache_data, true) {
+                Ok(()) => diagnose::log_lazy(|| {
+                    format!(
+                        "usage cache saved: accounts={} elapsed_ms={}",
+                        cache_data.accounts.len(),
+                        poll_started.elapsed().as_millis()
+                    )
+                }),
+                Err(error) => diagnose::log_error("unable to save usage cache", error),
+            }
+            if !notifications.is_empty() {
+                let body = notifications
+                    .iter()
+                    .map(|(provider, name)| {
+                        format!(
+                            "{} ({name}): {}",
+                            language.text(provider.descriptor().display_name),
+                            language.provider_auth_error(*provider).1
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                tray_icon::notify_balloon(hwnd, language.text("Sign in again"), &body);
+            }
 
             unsafe {
                 let _ = PostMessageW(Some(hwnd), WM_APP_USAGE_UPDATED, WPARAM(0), LPARAM(0));
             }
         }
         Err(failure) => {
+            diagnose::log_lazy(|| {
+                format!(
+                    "poll failed: {failure:?} elapsed_ms={}",
+                    poll_started.elapsed().as_millis()
+                )
+            });
+            if lock_state()
+                .as_ref()
+                .is_some_and(|s| s.providers != enabled_providers || s.accounts != accounts)
+            {
+                return;
+            }
             let auth_watch = match failure.error {
-                poller::PollError::AuthRequired | poller::PollError::TokenExpired => {
+                poller::PollError::AuthRequired
+                | poller::PollError::TokenExpired
+                | poller::PollError::HttpStatus(401 | 403) => {
                     let mode = poller::CredentialWatchMode::ActiveSource(failure.provider);
                     Some((mode, poller::credential_watch_snapshot(mode)))
                 }
@@ -2197,14 +2611,23 @@ fn do_poll_once(hwnd: HWND) {
                     let mode = poller::CredentialWatchMode::AllSources(failure.provider);
                     Some((mode, poller::credential_watch_snapshot(mode)))
                 }
-                poller::PollError::RequestFailed => None,
+                poller::PollError::RequestFailed
+                | poller::PollError::NetworkError
+                | poller::PollError::UnexpectedResponse
+                | poller::PollError::HttpStatus(_) => None,
             };
             // Distinguish auth-required errors from transient errors.
             let (notify_auth_error, cache_data, cache_poll_ok) = {
                 let mut state = lock_state();
+                if state
+                    .as_ref()
+                    .is_some_and(|s| s.providers != enabled_providers || s.accounts != accounts)
+                {
+                    return;
+                }
                 let mut should_notify = false;
                 if let Some(s) = state.as_mut() {
-                    if matches!(failure.error, poller::PollError::RequestFailed) {
+                    if failure.error.is_transient() {
                         if let Some(previous) = s.data.as_ref() {
                             let carried = poller::carry_forward_failures(
                                 AppUsageData::default(),
@@ -2215,13 +2638,13 @@ fn do_poll_once(hwnd: HWND) {
                         }
                     }
                     s.last_poll_ok = false;
+                    s.last_poll_failure = Some(failure);
                     match auth_watch {
                         Some((watch_mode, watch_snapshot)) => {
                             // Only show the balloon on the first failure so it doesn't spam.
-                            if s.retry_count == 0 || s.force_notify_auth_error {
+                            if s.retry_count == 0 || force {
                                 should_notify = true;
                             }
-                            s.force_notify_auth_error = false;
                             s.auth_error_paused_polling = true;
                             s.auth_watch_mode = watch_mode;
                             s.auth_watch_snapshot = watch_snapshot;
@@ -2235,7 +2658,6 @@ fn do_poll_once(hwnd: HWND) {
                         }
                         _ => {
                             // Transient network / credential-missing errors: exponential backoff.
-                            s.force_notify_auth_error = false;
                             s.auth_error_paused_polling = false;
                             s.auth_watch_mode = poller::CredentialWatchMode::ActiveSource(
                                 s.providers.first().unwrap_or_default(),
@@ -2316,8 +2738,8 @@ fn schedule_countdown_timer() {
     }
 
     let min_delay = s.data.as_ref().and_then(|data| {
-        data.iter()
-            .flat_map(|(_, usage)| [&usage.session, &usage.weekly])
+        data.all_usage()
+            .flat_map(|usage| usage.sections())
             .filter_map(|section| poller::time_until_display_change(section.resets_at))
             .min()
     });
@@ -2396,11 +2818,19 @@ fn reload_external_settings(hwnd: HWND) {
         let Some(state) = state.as_mut() else {
             return;
         };
-        providers_changed = state.providers != settings.enabled_providers();
+        providers_changed =
+            state.providers != settings.enabled_providers() || state.accounts != settings.accounts;
+        state.accounts = settings.accounts.clone();
+        if let Some(data) = state.data.as_mut() {
+            data.select_accounts(&settings.accounts);
+        }
         state.poll_interval_ms = settings.poll_interval_ms;
         state.providers = settings.enabled_providers();
         state.usage_countdown = settings.usage_countdown;
         state.taskbar_index = settings.taskbar_index;
+        state.tray_offset = settings.tray_offset;
+        state.placement_override = settings.placement_override;
+        state.floating_card_opacity = settings.floating_card_opacity;
         apply_language_to_state(state, language_override);
     }
     unsafe {
@@ -2443,6 +2873,7 @@ mod message_loop;
 use host_geometry::*;
 use message_loop::wnd_proc;
 mod positioning;
+mod taskbar_collision;
 use positioning::*;
 mod mouse;
 use mouse::*;
@@ -2451,6 +2882,9 @@ use window_context_menu::*;
 
 #[cfg(test)]
 mod placement_tests;
+
+#[cfg(test)]
+mod layered_window_tests;
 
 #[cfg(test)]
 mod language_menu_tests {
@@ -2488,6 +2922,64 @@ mod tray_usage_summary_tests {
             weekly_label: weekly_label.map(str::to_string),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn tray_errors_distinguish_causes_and_disappear_after_recovery() {
+        use crate::poller::{PollError, PollFailure};
+        let providers = ProviderSet::from_enabled([ProviderId::Claude]);
+        for (error, expected) in [
+            (PollError::TokenExpired, "Login expired"),
+            (PollError::NoCredentials, "No usable login"),
+            (PollError::AuthRequired, "Login rejected"),
+            (PollError::RequestFailed, "Usage request failed"),
+            (PollError::NetworkError, "Service unreachable"),
+            (PollError::UnexpectedResponse, "Unexpected usage response"),
+            (PollError::HttpStatus(429), "HTTP 429"),
+        ] {
+            let failure = PollFailure {
+                provider: ProviderId::Claude,
+                error,
+            };
+            let lines = tray_error_lines(None, Some(failure), providers, LanguageId::English);
+            assert_eq!(lines.len(), 1);
+            assert!(lines[0].contains(expected), "{:?}", lines);
+            assert!(tray_error_lines(
+                None,
+                Some(failure),
+                ProviderSet::from_enabled([ProviderId::Codex]),
+                LanguageId::English
+            )
+            .is_empty());
+        }
+        assert!(tray_error_lines(None, None, providers, LanguageId::English).is_empty());
+        let mut data = AppUsageData::default();
+        for (name, selected) in [("Work", false), ("Personal", true)] {
+            data.accounts.push(crate::models::AccountUsage {
+                provider: ProviderId::Claude,
+                profile: crate::accounts::AccountProfile {
+                    name: name.into(),
+                    enabled: true,
+                    ..Default::default()
+                },
+                source_signature: String::new(),
+                source_path: None,
+                usage: None,
+                error: Some(PollError::TokenExpired),
+                selected,
+            });
+        }
+        let lines = tray_error_lines(Some(&data), None, providers, LanguageId::English);
+        assert!(lines[0].starts_with("Claude Code (Personal): Login expired"));
+        assert!(lines[1].contains("Work"));
+        for account in &mut data.accounts {
+            account.error = None;
+        }
+        assert!(tray_error_lines(Some(&data), None, providers, LanguageId::English).is_empty());
+        let instruction = LanguageId::English
+            .provider_auth_error(ProviderId::Claude)
+            .1;
+        assert!(instruction.contains("desktop app") && instruction.contains("/login"));
     }
 
     #[test]
@@ -2581,5 +3073,47 @@ mod poll_display_state_tests {
             poll_display_state(false, 1, true, Some(&stale)),
             (false, true)
         );
+    }
+}
+
+#[cfg(test)]
+mod placement_regression_tests;
+
+#[cfg(test)]
+mod credential_watch_worker_tests {
+    use super::*;
+
+    #[test]
+    fn a_manual_refresh_queued_during_a_slow_watch_is_not_lost() {
+        let in_flight = AtomicBool::new(true);
+        let pending = AtomicBool::new(false);
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+        std::thread::scope(|scope| {
+            let in_flight = &in_flight;
+            let pending = &pending;
+            let worker = scope.spawn(move || {
+                let mut calls = Vec::new();
+                run_poll_worker(in_flight, pending, true, |scheduled| {
+                    calls.push(scheduled);
+                    if scheduled {
+                        started_tx.send(()).unwrap();
+                        resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                    }
+                });
+                calls
+            });
+            started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            // A second timer tick cannot acquire the worker while discovery is
+            // blocked, but an explicit refresh can queue for that worker.
+            assert!(in_flight
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                .is_err());
+            pending.store(true, Ordering::Release);
+            resume_tx.send(()).unwrap();
+            assert_eq!(worker.join().unwrap(), [true, false]);
+        });
+        assert!(!in_flight.load(Ordering::Acquire));
+        assert!(!pending.load(Ordering::Acquire));
     }
 }

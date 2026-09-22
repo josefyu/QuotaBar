@@ -302,6 +302,7 @@ fn studio_preview_uses_cached_poll_failure_state_instead_of_stale_values() {
     app.usage = Some(AppUsageData::from_iter([(
         crate::providers::ProviderId::Codex,
         crate::models::UsageData {
+            limits: Vec::new(),
             session: crate::models::UsageSection {
                 available: true,
                 percentage: 7.0,
@@ -345,8 +346,12 @@ fn app_with_surfaces(surfaces: Vec<SceneObject>) -> StudioApp {
     let history_snapshot = theme.clone();
     StudioApp {
         owner: 0,
+        update_status: crate::dashboard::UpdateStatus::Idle,
+        diagnostics: studio_diagnostics::DiagnosticsView::new(),
         page: Page::Studio,
         settings: SettingsFile::default(),
+        synced_poll_interval_ms: SettingsFile::default().poll_interval_ms,
+        poll_interval_editor_generation: 0,
         startup_enabled: false,
         theme,
         theme_path: None,
@@ -397,6 +402,98 @@ fn app_with_surfaces(surfaces: Vec<SceneObject>) -> StudioApp {
         context_menu_action_helper: None,
         delete_context_menu_confirmation: None,
     }
+}
+
+#[test]
+fn diagnostics_page_has_logging_controls_and_menu_version() {
+    let context = egui::Context::default();
+    configure_style(&context, LanguageId::English);
+    let mut app = app_with_surfaces(vec![root("main")]);
+    app.page = Page::Diagnostics;
+    let mut output = context.run_ui(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1100.0, 850.0),
+            )),
+            ..Default::default()
+        },
+        |ui| app.shell(ui),
+    );
+    fn collect_text(shape: &egui::epaint::Shape, text: &mut String) {
+        match shape {
+            egui::epaint::Shape::Text(shape) => {
+                text.push_str(&shape.galley.job.text);
+                text.push('\n');
+            }
+            egui::epaint::Shape::Vec(shapes) => {
+                for shape in shapes {
+                    collect_text(shape, text);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut text = String::new();
+    for shape in &output.shapes {
+        collect_text(&shape.shape, &mut text);
+    }
+    output.textures_delta.clear();
+    assert!(text.find("Assets").unwrap() < text.find("Diagnostics").unwrap());
+    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))));
+    assert!(text.contains("Logging"));
+    assert!(text.contains("Write diagnostic events to"));
+    assert!(text.contains("Disabled"));
+    assert!(text.contains("Refresh usage"));
+    assert!(text.contains("Follow latest event"));
+    assert!(text.contains("Copy log"));
+    assert!(!text.contains("Monitor disconnected"));
+    assert!(!text.contains("Dashboard process"));
+    assert!(!text.contains("Record diagnostics"));
+    assert!(!text.contains("Pause output"));
+    assert!(
+        !crate::diagnose::is_enabled(),
+        "visiting the page must not start recording"
+    );
+}
+
+#[test]
+fn context_menu_frequency_replaces_custom_dashboard_value_and_edit_buffer() {
+    let mut app = app_with_surfaces(vec![root("main")]);
+    app.settings.poll_interval_ms = 2 * POLL_1_MIN;
+    app.synced_poll_interval_ms = app.settings.poll_interval_ms;
+    app.dirty = true;
+
+    app.sync_poll_interval(POLL_5_MIN);
+    assert_eq!(app.settings.poll_interval_ms, POLL_5_MIN);
+    assert_eq!(app.poll_interval_editor_generation, 1);
+    assert!(app.dirty);
+
+    // An unrelated settings edit must not restore the previous two minutes.
+    app.settings.usage_countdown = true;
+    app.sync_poll_interval(POLL_5_MIN);
+    assert_eq!(app.settings.poll_interval_ms, POLL_5_MIN);
+    assert_eq!(app.poll_interval_editor_generation, 1);
+    assert!(app.settings.usage_countdown);
+}
+
+#[test]
+fn local_frequency_edits_survive_sync_before_save() {
+    let mut app = app_with_surfaces(vec![root("main")]);
+    app.sync_poll_interval(POLL_5_MIN);
+    let generation = app.poll_interval_editor_generation;
+    app.settings.poll_interval_ms = 2 * POLL_1_MIN;
+
+    // The on-disk preset is still five until the local edit has been saved.
+    app.sync_poll_interval(POLL_5_MIN);
+    assert_eq!(app.settings.poll_interval_ms, 2 * POLL_1_MIN);
+    assert_eq!(app.poll_interval_editor_generation, generation);
+
+    // After saving, a later context-menu selection becomes authoritative again.
+    app.synced_poll_interval_ms = app.settings.poll_interval_ms;
+    app.sync_poll_interval(POLL_15_MIN);
+    assert_eq!(app.settings.poll_interval_ms, POLL_15_MIN);
+    assert_eq!(app.poll_interval_editor_generation, generation + 1);
 }
 
 #[test]
@@ -623,6 +720,144 @@ fn text_helper_only_marks_real_template_tokens_as_expressions() {
 }
 
 #[test]
+fn reported_limits_are_grouped_with_claude_in_both_editors() {
+    use crate::models::{UsageData, UsageLimit, UsageSection};
+    use crate::providers::ProviderId;
+    let usage = UsageData {
+        limits: vec![UsageLimit {
+            key: "nimbus_quill".into(),
+            kind: "nimbus_quill".into(),
+            label: "nimbus quill".into(),
+            usage: UsageSection {
+                available: true,
+                percentage: 37.0,
+                resets_at: None,
+            },
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let data = AppUsageData::from_iter([(ProviderId::Claude, usage)]);
+    let context = DataContext::from_usage(Some(&data), &Canvas::default());
+    let language = LanguageId::English;
+    let choices = text_template_choices(&context, language);
+    let mut seen_claude = false;
+    let mut left_claude = false;
+    for value in &choices {
+        if value.group == "Claude Code" {
+            assert!(!left_claude, "Claude values must be in one group");
+            seen_claude = true;
+        } else if seen_claude {
+            left_claude = true;
+        }
+    }
+    let shown = choices
+        .iter()
+        .find(|value| value.expression == "claude.limits.nimbus_quill.display")
+        .unwrap();
+    assert_eq!(shown.group, "Claude Code");
+    assert_eq!(shown.label, "Nimbus quill — Shown");
+    let token = text_template_token(&shown.expression, TextTemplateFormat::Percentage);
+    assert_eq!(token, "{claude.limits.nimbus_quill.display:percent}");
+    assert_eq!(theme_engine::format_template(&token, &context), "37%");
+    for choice in choices
+        .iter()
+        .filter(|value| value.expression.starts_with("claude.limits."))
+    {
+        for format in text_template_formats(choice.kind) {
+            assert!(theme_engine::validate_template(
+                &text_template_token(&choice.expression, *format),
+                &context
+            )
+            .is_empty());
+        }
+    }
+    assert!(provider_limit_variables(&context, "claude")
+        .contains(&"claude.limits.nimbus_quill.display"));
+    assert!(!provider_limit_variables(&context, "codex")
+        .contains(&"claude.limits.nimbus_quill.display"));
+
+    // A refresh can remove a quota while its format picker remains open.
+    let empty = DataContext::from_usage(None, &Canvas::default());
+    let missing = text_template_choice(&shown.expression, &empty, language).unwrap();
+    assert_eq!(missing.expression, shown.expression);
+    assert!(matches!(
+        missing.kind,
+        TextTemplateValueKind::DisplayPercentage
+    ));
+}
+
+#[test]
+fn text_picker_renders_reported_quota_labels_and_formats() {
+    let context = egui::Context::default();
+    configure_style(&context, LanguageId::English);
+    let mut data = DataContext::from_usage(None, &Canvas::default());
+    data.insert("claude.limits.nimbus_quill.available", 1.0);
+    data.insert("claude.limits.nimbus_quill.percentage", 37.0);
+    data.insert_string("claude.limits.nimbus_quill.label", "nimbus quill");
+    let mut filter = "nimbus".to_string();
+    let mut selected = "claude.limits.nimbus_quill.percentage".to_string();
+    let mut format = TextTemplateFormat::Percentage;
+    let mut draft = String::new();
+    let mut output = context.run_ui(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1200.0, 900.0),
+            )),
+            ..Default::default()
+        },
+        |ui| {
+            ui.horizontal(|ui| {
+                text_template_values_panel(
+                    ui,
+                    egui::vec2(550.0, 800.0),
+                    &data,
+                    &mut filter,
+                    &mut selected,
+                    &mut format,
+                    LanguageId::English,
+                );
+                text_template_formats_panel(
+                    ui,
+                    egui::vec2(400.0, 800.0),
+                    &data,
+                    &selected,
+                    &mut format,
+                    &mut draft,
+                    LanguageId::English,
+                );
+            });
+        },
+    );
+    fn collect(shape: &egui::epaint::Shape, text: &mut String) {
+        match shape {
+            egui::epaint::Shape::Text(shape) => {
+                text.push_str(&shape.galley.job.text);
+                text.push('\n');
+            }
+            egui::epaint::Shape::Vec(shapes) => {
+                for shape in shapes {
+                    collect(shape, text);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut text = String::new();
+    for shape in &output.shapes {
+        collect(&shape.shape, &mut text);
+    }
+    output.textures_delta.clear();
+    assert!(text.contains("Claude Code"));
+    assert!(text.contains("Nimbus quill — Used"));
+    assert!(text.contains("37%"));
+    assert!(text.contains("Insert value"));
+    assert!(!text.contains("Additional usage limits"));
+    assert_eq!(selected, "claude.limits.nimbus_quill.percentage");
+}
+
+#[test]
 fn duplicating_layers_remaps_mouse_action_targets() {
     let mut source = object("source", None);
     source.mouse_events = Some(MouseEvents {
@@ -689,6 +924,166 @@ fn dirty_theme_defers_new_theme_until_the_user_decides() {
         Some(PendingUnsavedAction::NewTheme)
     );
     assert!(app.new_theme_name.is_none());
+}
+
+#[test]
+fn version_text_and_trailing_icon_share_one_update_button() {
+    fn footer_button(app: &mut StudioApp, ui: &mut egui::Ui) -> egui::Response {
+        ui.allocate_ui_with_layout(
+            egui::vec2(94.0, CONTROL_HEIGHT),
+            egui::Layout::right_to_left(egui::Align::Max),
+            |ui| app.version_button(ui),
+        )
+        .inner
+    }
+    for status in [
+        crate::dashboard::UpdateStatus::Idle,
+        crate::dashboard::UpdateStatus::Available("9.8.7".into()),
+    ] {
+        for click_icon in [false, true] {
+            let context = egui::Context::default();
+            configure_style(&context, LanguageId::English);
+            let mut app = app_with_surfaces(vec![root("alpha")]);
+            app.update_status = status.clone();
+            app.dirty = true;
+            let mut rect = egui::Rect::NOTHING;
+            run_test_ui(&context, egui::RawInput::default(), |ui| {
+                rect = footer_button(&mut app, ui).rect;
+            });
+            let footer_space = DEFAULT_MENU_WIDTH - 16.0 - 36.0 * 98.0 / 96.0 - 4.0;
+            assert!(
+                rect.width() <= footer_space,
+                "version button overflows footer: {rect:?}"
+            );
+            let position = egui::pos2(
+                if click_icon {
+                    rect.right() - 8.0
+                } else {
+                    rect.left() + 12.0
+                },
+                rect.center().y,
+            );
+            // Settle pointer movement, then allow the tooltip to appear.
+            run_test_ui(
+                &context,
+                egui::RawInput {
+                    time: Some(1.0),
+                    events: vec![egui::Event::PointerMoved(position)],
+                    ..Default::default()
+                },
+                |ui| {
+                    footer_button(&mut app, ui);
+                },
+            );
+            run_test_ui(
+                &context,
+                egui::RawInput {
+                    time: Some(2.0),
+                    ..Default::default()
+                },
+                |ui| {
+                    footer_button(&mut app, ui);
+                },
+            );
+            let mut output = context.run_ui(
+                egui::RawInput {
+                    time: Some(3.0),
+                    ..Default::default()
+                },
+                |ui| {
+                    rect = footer_button(&mut app, ui).rect;
+                },
+            );
+            let mut text = String::new();
+            let mut outlined = false;
+            let mut menu_hover_fill = false;
+            for shape in &output.shapes {
+                match &shape.shape {
+                    egui::epaint::Shape::Text(shape) => {
+                        text.push_str(&shape.galley.job.text);
+                        if shape.galley.job.text == format!("v{}", env!("CARGO_PKG_VERSION")) {
+                            let ink_center = shape.pos.y + shape.galley.mesh_bounds.center().y;
+                            assert!((ink_center - rect.center().y).abs() <= 1.0,
+                                "version text is not visually centred: ink={ink_center}, button={rect:?}");
+                        }
+                    }
+                    egui::epaint::Shape::Rect(shape) if shape.rect.contains_rect(rect) => {
+                        outlined |= shape.stroke.width > 0.0;
+                        menu_hover_fill |= shape.fill == crate::ui::theme::menu_hover();
+                    }
+                    _ => {}
+                }
+            }
+            output.textures_delta.clear();
+            let (icon, tooltip) = if matches!(status, crate::dashboard::UpdateStatus::Available(_))
+            {
+                (LucideIcon::Download, "Click to update to v9.8.7")
+            } else {
+                (LucideIcon::RefreshCw, "Check for updates")
+            };
+            assert!(text.contains(icon.unicode()), "missing update icon: {text}");
+            assert!(text.contains(tooltip), "missing update tooltip: {text}");
+            assert!(!outlined, "version button hover should have no border");
+            assert!(
+                menu_hover_fill,
+                "version button should use the menu hover fill"
+            );
+            let input = egui::RawInput {
+                events: vec![
+                    egui::Event::PointerMoved(position),
+                    egui::Event::PointerButton {
+                        pos: position,
+                        button: egui::PointerButton::Primary,
+                        pressed: true,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                    egui::Event::PointerButton {
+                        pos: position,
+                        button: egui::PointerButton::Primary,
+                        pressed: false,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+                ..Default::default()
+            };
+            run_test_ui(&context, input, |ui| {
+                footer_button(&mut app, ui);
+            });
+            assert_eq!(
+                app.pending_unsaved_action,
+                Some(PendingUnsavedAction::Update {
+                    install: matches!(status, crate::dashboard::UpdateStatus::Available(_)),
+                }),
+            );
+            assert!(app.theme_error.is_none());
+        }
+    }
+}
+
+#[test]
+fn update_button_ignores_repeated_clicks_while_busy() {
+    for status in [
+        crate::dashboard::UpdateStatus::Checking,
+        crate::dashboard::UpdateStatus::Applying,
+    ] {
+        let mut app = app_with_surfaces(vec![root("alpha")]);
+        app.update_status = status;
+        app.request_update_action();
+        assert!(app.theme_error.is_none());
+        assert!(app.pending_unsaved_action.is_none());
+    }
+}
+
+#[test]
+fn disconnected_update_button_reports_error_without_staying_busy() {
+    let mut app = app_with_surfaces(vec![root("alpha")]);
+    app.request_update_action();
+    assert!(app
+        .theme_error
+        .as_deref()
+        .unwrap()
+        .contains("not connected"));
+    assert!(!app.update_status.is_busy());
 }
 
 #[test]

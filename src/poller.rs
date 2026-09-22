@@ -5,12 +5,67 @@ use crate::diagnose;
 use crate::models::{AppUsageData, UsageData, UsageSection};
 use crate::providers::{ProviderId, ProviderSet};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum PollError {
     AuthRequired,
     NoCredentials,
     TokenExpired,
     RequestFailed,
+    NetworkError,
+    UnexpectedResponse,
+    /// Preserve the last HTTP failure so account status can explain the result.
+    HttpStatus(u16),
+}
+
+impl PollError {
+    pub fn is_auth(self) -> bool {
+        matches!(
+            self,
+            Self::AuthRequired | Self::TokenExpired | Self::HttpStatus(401 | 403)
+        )
+    }
+
+    pub fn is_transient(self) -> bool {
+        matches!(
+            self,
+            Self::RequestFailed
+                | Self::NetworkError
+                | Self::UnexpectedResponse
+                | Self::HttpStatus(_)
+        ) && !self.is_auth()
+    }
+
+    pub fn message(self, language: crate::localization::LanguageId) -> String {
+        match self {
+            Self::AuthRequired => language.text("Login rejected; sign in again").into(),
+            Self::TokenExpired => language
+                .text("Login expired and could not be renewed; sign in again")
+                .into(),
+            Self::NoCredentials => language.text("No usable login found; sign in first").into(),
+            Self::RequestFailed => language
+                .text("Usage request failed; retrying at the next refresh")
+                .into(),
+            Self::NetworkError => language
+                .text("Service unreachable; retrying at the next refresh")
+                .into(),
+            Self::UnexpectedResponse => language
+                .text("Unexpected usage response; retrying at the next refresh")
+                .into(),
+            Self::HttpStatus(code) => {
+                let reason = ureq::http::StatusCode::from_u16(code)
+                    .ok()
+                    .and_then(|status| status.canonical_reason())
+                    .unwrap_or("Request failed");
+                let action = if self.is_auth() {
+                    "Sign in again for this account"
+                } else {
+                    "Retrying at the next refresh"
+                };
+                format!("HTTP {code}: {reason}. {}", language.text(action))
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -27,8 +82,57 @@ pub struct PollFailure {
     pub error: PollError,
 }
 
-pub fn poll(enabled_providers: ProviderSet) -> Result<AppUsageData, PollFailure> {
-    poll_concurrently_with(enabled_providers, poll_provider)
+/// Polling and cache readers must agree on all files an account can read.
+pub fn account_source_signature(provider: ProviderId, path: &std::path::Path) -> String {
+    match provider {
+        ProviderId::Claude => claude::account_watch_signature(path),
+        _ => crate::accounts::file_signature(path),
+    }
+}
+
+pub fn poll(
+    enabled_providers: ProviderSet,
+    settings: &crate::accounts::AccountSettings,
+    previous: Option<&AppUsageData>,
+    force: bool,
+    on_progress: impl FnMut(AppUsageData),
+) -> Result<AppUsageData, PollFailure> {
+    if enabled_providers
+        .iter()
+        .any(|provider| settings.get(provider).is_some())
+    {
+        accounts::poll_accounts(enabled_providers, settings, previous, force, on_progress)
+    } else {
+        poll_concurrently_with_progress(enabled_providers, poll_provider, on_progress)
+    }
+}
+
+/// Replace only completed accounts/providers. Pending sources retain their
+/// previous readings; failures use the normal stale-data and account rules.
+pub fn merge_poll_progress(
+    update: AppUsageData,
+    previous: &AppUsageData,
+    settings: &crate::accounts::AccountSettings,
+) -> AppUsageData {
+    let providers = ProviderSet::from_enabled(
+        update
+            .iter()
+            .map(|(provider, _)| provider)
+            .chain(update.accounts.iter().map(|account| account.provider)),
+    );
+    let update = carry_forward_failures(update, previous, providers);
+    let mut merged = previous.clone();
+    for (provider, usage) in update.iter() {
+        merged.insert(provider, usage.clone());
+    }
+    for account in update.accounts {
+        merged
+            .accounts
+            .retain(|old| old.provider != account.provider || old.profile.id != account.profile.id);
+        merged.accounts.push(account);
+    }
+    merged.select_accounts(settings);
+    merged
 }
 
 /// Keep the previous reading for any enabled provider that failed this cycle.
@@ -43,7 +147,19 @@ pub fn carry_forward_failures(
     enabled: ProviderSet,
 ) -> AppUsageData {
     let mut merged = fresh;
+    accounts::carry_accounts(&mut merged, previous);
     for provider in enabled.iter() {
+        if merged
+            .accounts
+            .iter()
+            .any(|account| account.provider == provider)
+            || previous
+                .accounts
+                .iter()
+                .any(|account| account.provider == provider)
+        {
+            continue;
+        }
         if merged.get(provider).is_some() {
             continue;
         }
@@ -56,6 +172,7 @@ pub fn carry_forward_failures(
     merged
 }
 
+#[cfg(test)]
 fn poll_with(
     enabled_providers: ProviderSet,
     mut poll_provider: impl FnMut(ProviderId) -> Result<UsageData, PollError>,
@@ -69,6 +186,7 @@ fn poll_with(
 
 const MAX_CONCURRENT_PROVIDER_POLLS: usize = 3;
 
+#[cfg(test)]
 fn poll_concurrently_with<F>(
     enabled_providers: ProviderSet,
     poll_provider: F,
@@ -76,10 +194,18 @@ fn poll_concurrently_with<F>(
 where
     F: Fn(ProviderId) -> Result<UsageData, PollError> + Sync,
 {
+    poll_concurrently_with_progress(enabled_providers, poll_provider, |_| {})
+}
+
+fn poll_concurrently_with_progress<F>(
+    enabled_providers: ProviderSet,
+    poll_provider: F,
+    mut on_progress: impl FnMut(AppUsageData),
+) -> Result<AppUsageData, PollFailure>
+where
+    F: Fn(ProviderId) -> Result<UsageData, PollError> + Sync,
+{
     let providers = enabled_providers.iter().collect::<Vec<_>>();
-    if providers.len() <= 1 {
-        return poll_with(enabled_providers, poll_provider);
-    }
 
     let worker_count = providers.len().min(MAX_CONCURRENT_PROVIDER_POLLS);
     let next_provider = std::sync::atomic::AtomicUsize::new(0);
@@ -101,7 +227,15 @@ where
             });
         }
         drop(sender);
-        receiver.into_iter().collect::<Vec<_>>()
+        receiver
+            .into_iter()
+            .map(|(provider, result)| {
+                if let Ok(usage) = &result {
+                    on_progress(AppUsageData::from_iter([(provider, usage.clone())]));
+                }
+                (provider, result)
+            })
+            .collect::<Vec<_>>()
     });
     results.sort_by_key(|(provider, _)| *provider);
     merge_poll_results(enabled_providers, results)
@@ -140,6 +274,7 @@ fn merge_poll_results(
     }
 }
 
+mod accounts;
 mod antigravity;
 mod claude;
 mod claude_desktop;
@@ -398,18 +533,18 @@ fn time_until_display_change_from_secs(total_secs: u64) -> Duration {
     Duration::from_secs(total_secs.saturating_sub(current_bucket_start) + 1)
 }
 
-/// Returns true if either section has reached "now" (reset time has passed).
+/// Returns true if a reported usage window has reached its reset time.
 pub fn is_past_reset(data: &UsageData) -> bool {
     if data.stale {
         return false;
     }
     let now = SystemTime::now();
     let past = |s: &UsageSection| matches!(s.resets_at, Some(t) if now.duration_since(t).is_ok());
-    past(&data.session) || past(&data.weekly)
+    data.sections().any(past)
 }
 
 pub fn app_is_past_reset(data: &AppUsageData) -> bool {
-    data.iter().any(|(_, usage)| is_past_reset(usage))
+    data.all_usage().any(is_past_reset)
 }
 
 #[cfg(test)]
