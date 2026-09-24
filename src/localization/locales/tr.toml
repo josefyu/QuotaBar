@@ -60,6 +60,9 @@ cursor_window_title = "Cursor Kullanım İzleyicisi"
 
 [translations]
 "Absolute value" = "Mutlak değer"
+"Accounts" = "Accounts"
+"Add Claude account" = "Add Claude account"
+"Add Codex account" = "Add Codex account"
 "action helper" = "action helper"
 "Action helper" = "Eylem yardımcısı"
 "Action" = "Action"

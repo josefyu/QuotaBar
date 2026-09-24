@@ -60,7 +60,10 @@ cursor_window_title = "Cursor-gebruiksmonitor"
 
 [translations]
 "Absolute value" = "Absolute waarde"
+"Accounts" = "Accounts"
 "Action helper" = "Actiehulp"
+"Add Claude account" = "Add Claude account"
+"Add Codex account" = "Add Codex account"
 "action helper" = "action helper"
 "Action" = "Action"
 "Actions run from top to bottom in one update." = "Acties worden van boven naar beneden in één update uitgevoerd."

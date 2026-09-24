@@ -62,6 +62,9 @@ cursor_window_title = "Cursor 使用量監控"
 
 [translations]
 "Absolute value" = "絕對值"
+"Accounts" = "Accounts"
+"Add Claude account" = "Add Claude account"
+"Add Codex account" = "Add Codex account"
 "action helper" = "action helper"
 "Action helper" = "動作小幫手"
 "Action" = "Action"

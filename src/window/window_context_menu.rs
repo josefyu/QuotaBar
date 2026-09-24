@@ -1,4 +1,10 @@
+use std::os::windows::process::CommandExt;
+use std::process::Command;
+
 use super::*;
+
+/// Opens a console window the sign-in can be typed into.
+const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
 
 pub(super) fn show_context_menu_document(
     hwnd: HWND,
@@ -239,6 +245,69 @@ pub(super) fn context_menu_action_origin(
     })
 }
 
+
+/// Prepare a second (or third) login for a provider and open a terminal to
+/// sign in with. The profile is created up front and left enabled, so the
+/// widget picks the account up on its own once the credentials appear.
+fn add_account(hwnd: HWND, provider: ProviderId) {
+    let (variable, program, arguments, directory_prefix) = match provider {
+        ProviderId::Claude => ("CLAUDE_CONFIG_DIR", "claude", "", ".claude-"),
+        ProviderId::Codex => ("CODEX_HOME", "codex", " login", ".codex-"),
+        other => {
+            diagnose::log(format!(
+                "add account is only available for Claude and Codex, not {}",
+                other.descriptor().key
+            ));
+            return;
+        }
+    };
+
+    let Some(home) = dirs::home_dir() else {
+        diagnose::log("add account failed: no home directory");
+        return;
+    };
+
+    let mut settings = load_settings();
+    let accounts = match provider {
+        ProviderId::Claude => &mut settings.accounts.claude,
+        _ => &mut settings.accounts.codex,
+    };
+    accounts.add();
+    let Some(profile) = accounts.profiles.last_mut() else {
+        return;
+    };
+    let directory = home.join(format!("{directory_prefix}{}", profile.id));
+    profile.config_dir = directory.to_string_lossy().into_owned();
+    profile.enabled = true;
+    let name = profile.name.clone();
+    if let Err(error) = std::fs::create_dir_all(&directory) {
+        diagnose::log(format!(
+            "add account failed to create {}: {error}",
+            directory.display()
+        ));
+        return;
+    }
+    save_settings_or_log(&settings, "unable to save the new account");
+    reload_external_settings(hwnd);
+
+    // A console the user can actually type into: the sign-in is interactive.
+    let script = format!(
+        "$env:{variable} = '{}'; Write-Host 'QuotaBar: {name}'; Write-Host 'Sign in with /login, then close this window.'; {program}{arguments}",
+        directory.display()
+    );
+    let spawned = Command::new("powershell.exe")
+        .args(["-NoExit", "-NoProfile", "-Command", &script])
+        .creation_flags(CREATE_NEW_CONSOLE)
+        .spawn();
+    match spawned {
+        Ok(_) => diagnose::log(format!(
+            "added account {name} at {}",
+            directory.display()
+        )),
+        Err(error) => diagnose::log(format!("add account could not start {program}: {error}")),
+    }
+}
+
 pub(super) fn context_menu_widget_origin(theme: &ThemeDocument) -> Option<(usize, String)> {
     theme
         .surfaces
@@ -280,6 +349,7 @@ pub(super) fn execute_context_menu_action(
         | ContextMenuAction::LegacyResetPosition
         | ContextMenuAction::ToggleLayerRender { .. }
         | ContextMenuAction::LayerActions { .. }
+        | ContextMenuAction::AddAccount { .. }
         | ContextMenuAction::OpenUrl { .. } => None,
     };
     if let Some(command) = static_command {
@@ -289,6 +359,7 @@ pub(super) fn execute_context_menu_action(
         return;
     }
     match action {
+        ContextMenuAction::AddAccount { provider } => add_account(hwnd, provider),
         ContextMenuAction::ToggleWidget => {
             let target = lock_state()
                 .as_ref()

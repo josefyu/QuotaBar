@@ -60,6 +60,9 @@ cursor_window_title = "Monitor zużycia Cursor"
 
 [translations]
 "Absolute value" = "Wartość bezwzględna"
+"Accounts" = "Accounts"
+"Add Claude account" = "Add Claude account"
+"Add Codex account" = "Add Codex account"
 "action helper" = "asystent akcji"
 "Action helper" = "Asystent akcji"
 "Action" = "Akcja"

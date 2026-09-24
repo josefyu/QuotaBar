@@ -60,6 +60,9 @@ cursor_window_title = "Moniteur d'utilisation Cursor"
 
 [translations]
 "Absolute value" = "Valeur absolue"
+"Accounts" = "Accounts"
+"Add Claude account" = "Add Claude account"
+"Add Codex account" = "Add Codex account"
 "action helper" = "action helper"
 "Action helper" = "Assistant d’action"
 "Action" = "Action"

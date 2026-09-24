@@ -321,6 +321,9 @@ pub(super) fn context_menu_action_script(action: &ContextMenuAction) -> String {
         ContextMenuAction::ToggleProvider { provider } => {
             format!("toggle_provider({})", provider.descriptor().key)
         }
+        ContextMenuAction::AddAccount { provider } => {
+            format!("add_account({})", provider.descriptor().key)
+        }
         ContextMenuAction::ToggleStartup => "toggle_startup()".into(),
         ContextMenuAction::ToggleWidget => "toggle_widget()".into(),
         ContextMenuAction::LegacyResetPosition => String::new(),
@@ -397,6 +400,12 @@ pub(super) fn parse_context_menu_action_script(script: &str) -> Result<ContextMe
         let provider = ContextMenuProvider::from_key(&key)
             .ok_or_else(|| format!("Unknown provider: {key}"))?;
         return Ok(ContextMenuAction::ToggleProvider { provider });
+    }
+    if let Some(value) = call_arg("add_account") {
+        let key = value.trim_matches('"').to_ascii_lowercase();
+        let provider = ContextMenuProvider::from_key(&key)
+            .ok_or_else(|| format!("Unknown provider: {key}"))?;
+        return Ok(ContextMenuAction::AddAccount { provider });
     }
     if call_arg("set_language").is_some() {
         return Ok(ContextMenuAction::SetLanguage {

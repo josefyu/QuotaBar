@@ -83,6 +83,12 @@ pub enum ContextMenuAction {
     OpenUrl {
         url: String,
     },
+    /// Adds an account: a configuration directory of its own, a profile that
+    /// points at it, and a terminal to sign in with. Hand-editing settings is
+    /// otherwise the only way to track a second login.
+    AddAccount {
+        provider: ContextMenuProvider,
+    },
     Exit,
 }
 
@@ -424,6 +430,26 @@ pub fn classic_context_menu() -> ContextMenuDocument {
             }),
     )
     .collect();
+    let accounts = ContextMenuItem::submenu(
+        "accounts",
+        "Accounts",
+        vec![
+            ContextMenuItem::action(
+                "account-add-claude",
+                "Add Claude account",
+                Action::AddAccount {
+                    provider: Provider::Claude,
+                },
+            ),
+            ContextMenuItem::action(
+                "account-add-codex",
+                "Add Codex account",
+                Action::AddAccount {
+                    provider: Provider::Codex,
+                },
+            ),
+        ],
+    );
     let settings = ContextMenuItem::submenu(
         "settings",
         "Settings",
@@ -451,6 +477,7 @@ pub fn classic_context_menu() -> ContextMenuDocument {
             ContextMenuItem::action("refresh", "Refresh", Action::Refresh),
             frequency,
             providers,
+            accounts,
             settings,
             ContextMenuItem::action("toggle-widget", "Show widget", Action::ToggleWidget),
             ContextMenuItem::action("open-dashboard", "Open Dashboard", Action::OpenDashboard),
