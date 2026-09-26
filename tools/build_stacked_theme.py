@@ -37,7 +37,7 @@ WINDOWS = [('session', '5h'), ('weekly', '7d')]
 
 CARD_W = PAD_LEFT * 2 + LABEL_W + 2 * (BAR_W + GAP + VALUE_W) + GAP
 # Rows collapse when an account has no data, so the card height follows along.
-VISIBLE = ' + '.join(f'{prefix}.available' for _, prefix, _, _ in ROWS)
+VISIBLE = ' + '.join(f'max({prefix}.available, {prefix}.has_error)' for _, prefix, _, _ in ROWS)
 CARD_H = f'{PAD_TOP * 2 - ROW_GAP} + max(1, {VISIBLE}) * {ROW_HEIGHT + ROW_GAP}'
 
 TEXT = {
@@ -116,8 +116,10 @@ def build_children():
             'id': row_id,
             'name': f'{label} row',
             'parent': 'rows',
-            # An account without data collapses its row instead of showing "!".
-            'render': f'{prefix}.available',
+            # A row collapses only for an account that has nothing to say at
+            # all. One that errors keeps its place and shows "!", so a expired
+            # login is visible instead of silently missing.
+            'render': f'max({prefix}.available, {prefix}.has_error)',
             'width': str(CARD_W - 2 * PAD_LEFT),
             'height': str(ROW_HEIGHT),
         })
@@ -183,7 +185,7 @@ def build_children():
             'id': row_id,
             'name': f'{label} reset row',
             'parent': 'reset-rows',
-            'render': f'{prefix}.available',
+            'render': f'max({prefix}.available, {prefix}.has_error)',
             'width': str(CARD_W - 2 * PAD_LEFT),
             'height': str(ROW_HEIGHT),
         })
