@@ -308,6 +308,119 @@ fn add_account(hwnd: HWND, provider: ProviderId) {
     }
 }
 
+
+/// The command that signs an account in, and the directory it applies to.
+struct SignIn {
+    name: String,
+    variable: &'static str,
+    directory: PathBuf,
+    command: &'static str,
+    argument: &'static str,
+    stale: bool,
+}
+
+fn sign_in_targets() -> Vec<SignIn> {
+    let state = lock_state();
+    let Some(state) = state.as_ref() else {
+        return Vec::new();
+    };
+    let mut targets: Vec<SignIn> = Vec::new();
+    for (provider, accounts) in [
+        (ProviderId::Claude, &state.accounts.claude),
+        (ProviderId::Codex, &state.accounts.codex),
+    ] {
+        let (variable, command, argument) = match provider {
+            ProviderId::Claude => ("CLAUDE_CONFIG_DIR", "claude", ""),
+            _ => ("CODEX_HOME", "codex", "login"),
+        };
+        for profile in accounts.profiles.iter().filter(|profile| profile.enabled) {
+            let Some(directory) = profile_config_directory(provider, profile) else {
+                continue;
+            };
+            // A token that was rejected, or was never there, is what the user
+            // is actually after; the rest ride along so one pass covers them.
+            let stale = state
+                .data
+                .as_ref()
+                .and_then(|data| {
+                    data.accounts
+                        .iter()
+                        .find(|account| {
+                            account.provider == provider && account.profile.id == profile.id
+                        })
+                        .map(|account| {
+                            account.error.is_some_and(|error| {
+                                error.is_auth() || error == crate::poller::PollError::NoCredentials
+                            })
+                        })
+                })
+                .unwrap_or(true);
+            targets.push(SignIn {
+                name: profile.name.clone(),
+                variable,
+                directory,
+                command,
+                argument,
+                stale,
+            });
+        }
+    }
+    // Expired logins first: the window can be closed once they are done.
+    targets.sort_by_key(|target| !target.stale);
+    targets
+}
+
+fn profile_config_directory(
+    provider: ProviderId,
+    profile: &crate::accounts::AccountProfile,
+) -> Option<PathBuf> {
+    let configured = profile.config_dir.trim();
+    if !configured.is_empty() {
+        return Some(PathBuf::from(configured));
+    }
+    crate::accounts::default_credential_path(provider)
+        .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+}
+
+/// Sign in to every account that needs it, in one console, one after another.
+fn sign_in_accounts() {
+    let targets = sign_in_targets();
+    if targets.is_empty() {
+        diagnose::log("sign in: no enabled accounts");
+        return;
+    }
+    let quote = |value: &str| format!("'{}'", value.replace('\'', "''"));
+    let stale_count = targets.iter().filter(|target| target.stale).count();
+    let mut script = format!(
+        "Write-Host 'QuotaBar: {stale_count} of {} accounts need signing in.' -ForegroundColor Cyan; ",
+        targets.len()
+    );
+    for target in &targets {
+        let marker = if target.stale { "needs sign-in" } else { "still valid" };
+        script.push_str(&format!(
+            "Write-Host ''; Write-Host '=== {} ({marker}) ===' -ForegroundColor Cyan;              Write-Host 'Run /login, then leave the CLI to continue with the next account.';              $env:CLAUDE_CONFIG_DIR = $null; $env:CODEX_HOME = $null;              Set-Item env:{} {}; & {} {}; ",
+            target.name.replace('\'', ""),
+            target.variable,
+            quote(&target.directory.to_string_lossy()),
+            target.command,
+            target.argument,
+        ));
+    }
+    script.push_str("Write-Host ''; Write-Host 'All accounts handled. You can close this window.' -ForegroundColor Green");
+
+    match Command::new("powershell.exe")
+        .args(["-NoExit", "-NoProfile", "-Command", &script])
+        .creation_flags(CREATE_NEW_CONSOLE)
+        .spawn()
+    {
+        Ok(_) => diagnose::log(format!(
+            "sign in started for {} accounts ({stale_count} stale)",
+            targets.len()
+        )),
+        Err(error) => diagnose::log(format!("sign in could not start a console: {error}")),
+    }
+}
+
 pub(super) fn context_menu_widget_origin(theme: &ThemeDocument) -> Option<(usize, String)> {
     theme
         .surfaces
@@ -350,6 +463,7 @@ pub(super) fn execute_context_menu_action(
         | ContextMenuAction::ToggleLayerRender { .. }
         | ContextMenuAction::LayerActions { .. }
         | ContextMenuAction::AddAccount { .. }
+        | ContextMenuAction::SignInAccounts
         | ContextMenuAction::OpenUrl { .. } => None,
     };
     if let Some(command) = static_command {
@@ -360,6 +474,7 @@ pub(super) fn execute_context_menu_action(
     }
     match action {
         ContextMenuAction::AddAccount { provider } => add_account(hwnd, provider),
+        ContextMenuAction::SignInAccounts => sign_in_accounts(),
         ContextMenuAction::ToggleWidget => {
             let target = lock_state()
                 .as_ref()

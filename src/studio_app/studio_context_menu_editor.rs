@@ -324,6 +324,7 @@ pub(super) fn context_menu_action_script(action: &ContextMenuAction) -> String {
         ContextMenuAction::AddAccount { provider } => {
             format!("add_account({})", provider.descriptor().key)
         }
+        ContextMenuAction::SignInAccounts => "sign_in_accounts()".into(),
         ContextMenuAction::ToggleStartup => "toggle_startup()".into(),
         ContextMenuAction::ToggleWidget => "toggle_widget()".into(),
         ContextMenuAction::LegacyResetPosition => String::new(),
@@ -353,6 +354,7 @@ pub(super) fn parse_context_menu_action_script(script: &str) -> Result<ContextMe
         ("toggle_startup", ContextMenuAction::ToggleStartup),
         ("toggle_widget", ContextMenuAction::ToggleWidget),
         ("check_for_updates", ContextMenuAction::CheckForUpdates),
+        ("sign_in_accounts", ContextMenuAction::SignInAccounts),
         ("exit", ContextMenuAction::Exit),
     ] {
         if script == format!("{name}()") {

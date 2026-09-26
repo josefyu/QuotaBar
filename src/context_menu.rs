@@ -89,6 +89,10 @@ pub enum ContextMenuAction {
     AddAccount {
         provider: ContextMenuProvider,
     },
+    /// Walks every account that needs signing in again through one terminal,
+    /// because tokens tend to expire together and chasing them one by one is
+    /// the tedious part.
+    SignInAccounts,
     Exit,
 }
 
@@ -447,6 +451,12 @@ pub fn classic_context_menu() -> ContextMenuDocument {
                 Action::AddAccount {
                     provider: Provider::Codex,
                 },
+            ),
+            ContextMenuItem::separator("accounts-separator"),
+            ContextMenuItem::action(
+                "accounts-sign-in",
+                "Sign in to accounts",
+                Action::SignInAccounts,
             ),
         ],
     );
