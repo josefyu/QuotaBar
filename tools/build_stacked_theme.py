@@ -35,10 +35,11 @@ GAP = 5
 
 WINDOWS = [('session', '5h'), ('weekly', '7d')]
 
-CARD_W = PAD_LEFT * 2 + LABEL_W + 2 * (BAR_W + GAP + VALUE_W) + GAP
+RESET_W = 82
+CARD_W = PAD_LEFT * 2 + LABEL_W + 2 * (BAR_W + GAP + VALUE_W + GAP) + RESET_W
 # Rows collapse when an account has no data, so the card height follows along.
-VISIBLE = ' + '.join(f'max({prefix}.available, {prefix}.has_error)' for _, prefix, _, _ in ROWS)
-CARD_H = f'{PAD_TOP * 2 - ROW_GAP} + max(1, {VISIBLE}) * {ROW_HEIGHT + ROW_GAP}'
+VISIBLE = None  # gesetzt, sobald die Helfer definiert sind
+CARD_H = None  # siehe card_height()
 
 TEXT = {
     'font_family': 'Segoe UI',
@@ -56,6 +57,39 @@ PALETTE = {
     'light': {'label': '#5A5A5AFF', 'value': '#1F1F1FFF', 'track': '#B8B8B8FF', 'overlay_bg': '#FAFAFAFF', 'overlay': '#1F1F1FFF'},
 }
 RENDER = {'dark': 'system.dark', 'light': '1 - system.dark'}
+
+
+
+def visible(prefix):
+    """A row shows while the account has data or something to complain about."""
+    return f'max({prefix}.available, {prefix}.has_error)'
+
+
+def sort_key(prefix):
+    """Weekly reset as the sort key; accounts without one fall to the end."""
+    reset = f'{prefix}.weekly.reset.unix'
+    return f'({reset} + ({reset} <= 0) * 99999999999)'
+
+
+def row_offset(index):
+    """Rank of a row: how many visible accounts reset before this one.
+
+    The theme engine cannot sort, so each row derives its own position by
+    counting the accounts that belong above it. Ties keep the declared order,
+    which is what stops two rows from landing on the same line.
+    """
+    own_prefix = ROWS[index][1]
+    own_key = sort_key(own_prefix)
+    terms = []
+    for other, (_, prefix, _, _) in enumerate(ROWS):
+        if other == index:
+            continue
+        earlier = f'({sort_key(prefix)} < {own_key})'
+        if other < index:
+            earlier = f'({earlier} + ({sort_key(prefix)} == {own_key}))'
+        terms.append(f'{visible(prefix)} * {earlier}')
+    rank = ' + '.join(terms) if terms else '0'
+    return f'({rank}) * {ROW_HEIGHT + ROW_GAP}'
 
 
 def text_object(oid, name, parent, x, y, width, template, colour, render, align='left'):
@@ -96,6 +130,11 @@ def progress_object(oid, name, parent, x, y, value, fill, track, render):
     }
 
 
+def card_height():
+    total = ' + '.join(visible(prefix) for _, prefix, _, _ in ROWS)
+    return f'{PAD_TOP * 2 - ROW_GAP} + max(1, {total}) * {ROW_HEIGHT + ROW_GAP}'
+
+
 def build_children():
     children = [
         {
@@ -105,12 +144,10 @@ def build_children():
             'y': str(PAD_TOP),
             'width': str(CARD_W - 2 * PAD_LEFT),
             'height': f'canvas.height - {PAD_TOP * 2}',
-            'layout': 'column',
-            'gap': str(ROW_GAP),
         }
     ]
 
-    for suffix, prefix, label, accent in ROWS:
+    for index, (suffix, prefix, label, accent) in enumerate(ROWS):
         row_id = f'row-{suffix}'
         children.append({
             'id': row_id,
@@ -119,7 +156,8 @@ def build_children():
             # A row collapses only for an account that has nothing to say at
             # all. One that errors keeps its place and shows "!", so a expired
             # login is visible instead of silently missing.
-            'render': f'max({prefix}.available, {prefix}.has_error)',
+            'render': visible(prefix),
+            'y': row_offset(index),
             'width': str(CARD_W - 2 * PAD_LEFT),
             'height': str(ROW_HEIGHT),
         })
@@ -141,6 +179,17 @@ def build_children():
                     '{' + f'{prefix}.{window}.display:usage_badge' + '}',
                     colours['value'], render))
                 x += BAR_W + GAP + VALUE_W + GAP
+
+            reset = f'{prefix}.weekly.reset.unix'
+            children.append(text_object(
+                f'{row_id}-reset-{mode}', f'{label} weekly reset ({mode})', row_id,
+                x, 1, RESET_W,
+                '{' + f'{reset}:day_2' + '}.{' + f'{reset}:month_2' + '}. {' + f'{reset}:time_24' + '}',
+                colours['label'], f'({render}) && {prefix}.weekly.available'))
+            children.append(text_object(
+                f'{row_id}-reset-none-{mode}', f'{label} without weekly ({mode})', row_id,
+                x, 1, RESET_W, '—', colours['label'],
+                f'({render}) && (1 - {prefix}.weekly.available)'))
 
     # The overlay: hidden until a click turns it on, then it covers the rows
     # with the reset time of every window. It repeats the same column layout so
@@ -176,16 +225,15 @@ def build_children():
         'y': str(PAD_TOP),
         'width': str(CARD_W - 2 * PAD_LEFT),
         'height': f'canvas.height - {PAD_TOP * 2}',
-        'layout': 'column',
-        'gap': str(ROW_GAP),
     })
-    for suffix, prefix, label, _ in ROWS:
+    for index, (suffix, prefix, label, _) in enumerate(ROWS):
         row_id = f'reset-row-{suffix}'
         children.append({
             'id': row_id,
             'name': f'{label} reset row',
             'parent': 'reset-rows',
-            'render': f'max({prefix}.available, {prefix}.has_error)',
+            'render': visible(prefix),
+            'y': row_offset(index),
             'width': str(CARD_W - 2 * PAD_LEFT),
             'height': str(ROW_HEIGHT),
         })
@@ -207,7 +255,7 @@ def main():
     main_surface = next(surface for surface in document['surfaces'] if surface['id'] == 'main')
     main_surface['name'] = 'Accounts stacked'
     main_surface['width'] = str(CARD_W)
-    main_surface['height'] = CARD_H
+    main_surface['height'] = card_height()
     main_surface['mouse_events'] = {
         'click': 'toggle("reset-overlay", render)',
         'right_click': 'show_context_menu("classic-v1")',
