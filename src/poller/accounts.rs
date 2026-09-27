@@ -76,6 +76,13 @@ where
     poll_accounts_with_progress(enabled, settings, previous, force, poll, |_| {})
 }
 
+/// How much later each additional account of one provider starts its poll.
+/// Tests run without the wait, so they stay as quick as the rest of the suite.
+#[cfg(not(test))]
+const ACCOUNT_POLL_STAGGER: std::time::Duration = std::time::Duration::from_millis(2_000);
+#[cfg(test)]
+const ACCOUNT_POLL_STAGGER: std::time::Duration = std::time::Duration::ZERO;
+
 fn poll_accounts_with_progress<F>(
     enabled: ProviderSet,
     settings: &AccountSettings,
@@ -127,12 +134,25 @@ where
             groups.push(vec![target]);
         }
     }
+    // Accounts of one provider answer from the same endpoint, and asking for
+    // all of them at once is what earns a 429. Each additional account of a
+    // provider therefore waits a little longer before its first request.
+    let mut same_provider_before = Vec::with_capacity(groups.len());
+    for (index, group) in groups.iter().enumerate() {
+        same_provider_before.push(
+            groups[..index]
+                .iter()
+                .filter(|earlier| earlier[0].provider == group[0].provider)
+                .count() as u32,
+        );
+    }
     let next = std::sync::atomic::AtomicUsize::new(0);
     let mut results = std::thread::scope(|scope| {
         let (sender, receiver) = std::sync::mpsc::channel();
         for _ in 0..groups.len().min(MAX_CONCURRENT_PROVIDER_POLLS) {
             let sender = sender.clone();
             let groups = &groups;
+            let same_provider_before = &same_provider_before;
             let next = &next;
             let poll = &poll;
             scope.spawn(move || loop {
@@ -140,6 +160,10 @@ where
                 let Some(group) = groups.get(index) else {
                     break;
                 };
+                let stagger = ACCOUNT_POLL_STAGGER * same_provider_before[index];
+                if !stagger.is_zero() {
+                    std::thread::sleep(stagger);
+                }
                 let target = &group[0];
                 let mut signature = target.signature();
                 let paused_error = if force {
