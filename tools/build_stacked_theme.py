@@ -36,7 +36,8 @@ GAP = 5
 WINDOWS = [('session', '5h'), ('weekly', '7d')]
 
 RESET_W = 82
-CARD_W = PAD_LEFT * 2 + LABEL_W + 2 * (BAR_W + GAP + VALUE_W + GAP) + RESET_W
+COUNT_W = 46  # countdown to the 5h reset, e.g. "4h 59m"
+CARD_W = PAD_LEFT * 2 + LABEL_W + 2 * (BAR_W + GAP + VALUE_W + GAP) + COUNT_W + GAP + RESET_W
 # Rows collapse when an account has no data, so the card height follows along.
 VISIBLE = None  # gesetzt, sobald die Helfer definiert sind
 CARD_H = None  # siehe card_height()
@@ -179,6 +180,18 @@ def build_children():
                     '{' + f'{prefix}.{window}.display:usage_badge' + '}',
                     colours['value'], render))
                 x += BAR_W + GAP + VALUE_W + GAP
+                if window == 'session':
+                    # Time left until the 5h window resets, as a countdown.
+                    children.append(text_object(
+                        f'{row_id}-session-countdown-{mode}', f'{label} 5h countdown ({mode})', row_id,
+                        x, 1, COUNT_W,
+                        '{' + f'{prefix}.session.reset.seconds:duration' + '}',
+                        colours['label'], f'({render}) && {prefix}.session.available'))
+                    children.append(text_object(
+                        f'{row_id}-session-countdown-none-{mode}', f'{label} 5h without countdown ({mode})', row_id,
+                        x, 1, COUNT_W, '—', colours['label'],
+                        f'({render}) && (1 - {prefix}.session.available)'))
+                    x += COUNT_W + GAP
 
             reset = f'{prefix}.weekly.reset.unix'
             children.append(text_object(
