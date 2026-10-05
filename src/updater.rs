@@ -485,15 +485,60 @@ fn is_version_newer(candidate: &str, current: &str) -> bool {
     parse_version(candidate) > parse_version(current)
 }
 
-fn parse_version(version: &str) -> (u32, u32, u32) {
-    let core = version.split('-').next().unwrap_or(version);
+fn parse_version(version: &str) -> (u32, u32, u32, u32) {
+    let version = version.trim_start_matches('v');
+    let (core, suffix) = match version.split_once('-') {
+        Some((core, suffix)) => (core, Some(suffix)),
+        None => (version, None),
+    };
     let mut parts = core.split('.').map(|part| part.parse::<u32>().unwrap_or(0));
+
+    // This fork numbers its own builds "<upstream version>-quotabar.N". A plain
+    // release counts as build 0, so every fork build of the same version is newer.
+    let build = suffix
+        .and_then(|suffix| suffix.strip_prefix("quotabar."))
+        .and_then(|number| number.split(['.', '+']).next())
+        .and_then(|number| number.parse::<u32>().ok())
+        .unwrap_or(0);
 
     (
         parts.next().unwrap_or(0),
         parts.next().unwrap_or(0),
         parts.next().unwrap_or(0),
+        build,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_version_newer;
+
+    #[test]
+    fn fork_build_is_newer_than_the_plain_release_of_the_same_version() {
+        assert!(is_version_newer("2.13.44-quotabar.1", "2.13.44"));
+        assert!(!is_version_newer("2.13.44", "2.13.44-quotabar.1"));
+    }
+
+    #[test]
+    fn later_fork_builds_are_offered_and_the_same_build_is_not() {
+        assert!(is_version_newer("2.13.44-quotabar.2", "2.13.44-quotabar.1"));
+        assert!(is_version_newer("2.13.44-quotabar.10", "2.13.44-quotabar.9"));
+        assert!(!is_version_newer("2.13.44-quotabar.2", "2.13.44-quotabar.2"));
+        assert!(!is_version_newer("2.13.44-quotabar.1", "2.13.44-quotabar.2"));
+    }
+
+    #[test]
+    fn a_newer_upstream_version_wins_over_any_fork_build() {
+        assert!(is_version_newer("2.13.45", "2.13.44-quotabar.7"));
+        assert!(is_version_newer("2.14.0-quotabar.1", "2.13.99-quotabar.9"));
+        assert!(!is_version_newer("2.13.43", "2.13.44-quotabar.1"));
+    }
+
+    #[test]
+    fn a_leading_v_and_unknown_suffixes_do_not_break_the_comparison() {
+        assert!(is_version_newer("v2.13.44-quotabar.1", "2.13.44"));
+        assert!(!is_version_newer("2.13.44-rc.1", "2.13.44"));
+    }
 }
 
 fn show_error_message(title: &str, message: &str) {

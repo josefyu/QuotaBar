@@ -440,7 +440,7 @@ fn diagnostics_page_has_logging_controls_and_menu_version() {
     }
     output.textures_delta.clear();
     assert!(text.find("Assets").unwrap() < text.find("Diagnostics").unwrap());
-    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))));
+    assert!(text.contains(&format!("v{}", studio_core::footer_version())));
     assert!(text.contains("Logging"));
     assert!(text.contains("Write diagnostic events to"));
     assert!(text.contains("Disabled"));
@@ -1001,7 +1001,7 @@ fn version_text_and_trailing_icon_share_one_update_button() {
                 match &shape.shape {
                     egui::epaint::Shape::Text(shape) => {
                         text.push_str(&shape.galley.job.text);
-                        if shape.galley.job.text == format!("v{}", env!("CARGO_PKG_VERSION")) {
+                        if shape.galley.job.text == format!("v{}", studio_core::footer_version()) {
                             let ink_center = shape.pos.y + shape.galley.mesh_bounds.center().y;
                             assert!((ink_center - rect.center().y).abs() <= 1.0,
                                 "version text is not visually centred: ink={ink_center}, button={rect:?}");

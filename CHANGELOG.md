@@ -4,6 +4,12 @@ Notable changes to Claude Code Usage Monitor are documented here, newest first.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), with
 changes grouped into Added, Changed, Fixed, and Removed where applicable.
 
+## [2.13.44-quotabar.2] - 2026-10-05
+
+### Fixed
+
+- Made the in-app updater recognise this fork's `-quotabar.N` builds. The version check used to drop everything after the hyphen, so `v2.13.44-quotabar.1` compared equal to `2.13.44` and the update button reported "up to date". A fork build now sorts after the plain release of the same version, and a newer upstream version still wins over any fork build.
+
 ## [2.13.44] - 2026-09-22
 
 ### Changed

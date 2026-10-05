@@ -908,7 +908,7 @@ impl StudioApp {
             .scope(|ui| {
                 ui.add_enabled_ui(!self.update_status.is_busy(), |ui| {
                     let icon_id = ui.id().with("version-update-icon");
-                    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+                    let version = format!("v{}", footer_version());
                     let background = ui.painter().add(egui::Shape::Noop);
                     let button = egui::AtomLayout::new((
                         egui::RichText::new(&version).size(16.0).color(muted()),
@@ -1094,4 +1094,12 @@ impl StudioApp {
         ui.separator();
         ui.add_space(8.0);
     }
+}
+
+/// The version shown in the dashboard footer. The footer only has room for the
+/// numeric version, so a fork build suffix such as "-quotabar.2" is left out.
+/// The full version stays in the executable's properties and the diagnostics.
+pub(super) fn footer_version() -> &'static str {
+    let version = env!("CARGO_PKG_VERSION");
+    version.split('-').next().unwrap_or(version)
 }
