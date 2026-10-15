@@ -16,9 +16,9 @@ TARGET = os.path.join(TARGET_DIR, 'stacked-accounts.json')
 
 # Rows, in display order: (object id suffix, context prefix, label, accent)
 ROWS = [
-    ('claude-default', 'accounts.claude.default', 'Geist', '#D97757FF'),
-    ('claude-lab', 'accounts.claude.lab', 'Spielvogel', '#D97757FF'),
-    ('claude-privat', 'accounts.claude.privat', 'Privat', '#D97757FF'),
+    ('claude-default', 'accounts.claude.default', 'Konto 1', '#D97757FF'),
+    ('claude-lab', 'accounts.claude.lab', 'Konto 2', '#D97757FF'),
+    ('claude-privat', 'accounts.claude.privat', 'Konto 3', '#D97757FF'),
     ('codex-default', 'accounts.codex.default', 'Codex', '#F5F5F5FF'),
 ]
 
