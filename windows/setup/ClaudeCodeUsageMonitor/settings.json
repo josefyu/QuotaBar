@@ -1,0 +1,76 @@
+{
+  "accounts": {
+    "claude": {
+      "profiles": [
+        {
+          "config_dir": "C:\\Users\\fujitsu\\.claude-konto1",
+          "credentials_path": "",
+          "enabled": true,
+          "id": "default",
+          "name": "Konto 1"
+        },
+        {
+          "config_dir": "C:\\Users\\fujitsu\\.claude-konto2",
+          "credentials_path": "",
+          "enabled": true,
+          "id": "lab",
+          "name": "Konto 2"
+        },
+        {
+          "config_dir": "C:\\Users\\fujitsu\\.claude-konto3",
+          "credentials_path": "",
+          "enabled": true,
+          "id": "privat",
+          "name": "Konto 3"
+        }
+      ],
+      "selected": "default",
+      "used_ids": [
+        "default",
+        "lab",
+        "privat"
+      ]
+    },
+    "codex": {
+      "profiles": [
+        {
+          "config_dir": "",
+          "credentials_path": "",
+          "enabled": true,
+          "id": "default",
+          "name": "Default"
+        }
+      ],
+      "selected": "default",
+      "used_ids": [
+        "default"
+      ]
+    }
+  },
+  "active_theme_path": "C:\\Users\\fujitsu\\AppData\\Roaming\\ClaudeCodeUsageMonitor\\themes\\stacked-accounts.json",
+  "custom_theme_enabled": true,
+  "dashboard_height": 600.0,
+  "dashboard_width": 1100.0,
+  "floating_card_opacity": 100,
+  "last_update_check_unix": 1792058725,
+  "placement_override": {
+    "floating_host": {
+      "height": 40,
+      "surface_id": "main",
+      "theme_id": "stacked-accounts",
+      "width": 1920
+    },
+    "monitor_index": 0,
+    "nest": "floating",
+    "screen_x": 1356,
+    "screen_y": 57,
+    "tray_offset": 0
+  },
+  "poll_interval_ms": 60000,
+  "show_antigravity": false,
+  "show_claude_code": true,
+  "show_codex": true,
+  "show_cursor": false,
+  "show_opencode": false,
+  "usage_countdown": false
+}

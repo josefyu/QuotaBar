@@ -1,0 +1,3150 @@
+{
+  "schema_version": 1,
+  "id": "stacked-accounts",
+  "name": "Accounts untereinander",
+  "surfaces": [
+    {
+      "id": "main",
+      "name": "Accounts stacked",
+      "placement": {
+        "reference": {
+          "region": "system_tray",
+          "display": 0
+        },
+        "nest": "taskbar",
+        "horizontal": "left",
+        "vertical": "bottom",
+        "surface_horizontal": "right",
+        "surface_vertical": "bottom",
+        "offset_x": 0,
+        "offset_y": 0
+      },
+      "width": "431",
+      "height": "7 + max(1, max(accounts.claude.default.available, accounts.claude.default.has_error) + max(accounts.claude.lab.available, accounts.claude.lab.has_error) + max(accounts.claude.privat.available, accounts.claude.privat.has_error) + max(accounts.codex.default.available, accounts.codex.default.has_error)) * 18",
+      "mouse_events": {
+        "click": "toggle(\"reset-overlay\", render)",
+        "right_click": "show_context_menu(\"classic-v1\")"
+      },
+      "children": [
+        {
+          "id": "rows",
+          "name": "Accounts",
+          "x": "8",
+          "y": "5",
+          "width": "415",
+          "height": "canvas.height - 10"
+        },
+        {
+          "id": "row-claude-default",
+          "name": "Konto 1 row",
+          "parent": "rows",
+          "render": "max(accounts.claude.default.available, accounts.claude.default.has_error)",
+          "y": "(max(accounts.claude.lab.available, accounts.claude.lab.has_error) * ((accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999)) + max(accounts.claude.privat.available, accounts.claude.privat.has_error) * ((accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999)) + max(accounts.codex.default.available, accounts.codex.default.has_error) * ((accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999))) * 18",
+          "width": "415",
+          "height": "15"
+        },
+        {
+          "id": "row-claude-default-label-dark",
+          "name": "Konto 1 label (dark)",
+          "parent": "row-claude-default",
+          "render": "system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "62",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Konto 1",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-session-bar-dark",
+          "name": "Konto 1 session bar (dark)",
+          "parent": "row-claude-default",
+          "render": "system.dark",
+          "x": "62",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.claude.default.session.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#D97757FF"
+            },
+            "track": {
+              "color": "#4A4A4AFF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-claude-default-session-value-dark",
+          "name": "Konto 1 session value (dark)",
+          "parent": "row-claude-default",
+          "render": "system.dark",
+          "x": "133",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.default.session.display:usage_badge}",
+            "color": {
+              "color": "#F0F0F0FF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-session-countdown-dark",
+          "name": "Konto 1 5h countdown (dark)",
+          "parent": "row-claude-default",
+          "render": "(system.dark) && accounts.claude.default.session.available",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.default.session.reset.seconds:duration}",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-session-countdown-none-dark",
+          "name": "Konto 1 5h without countdown (dark)",
+          "parent": "row-claude-default",
+          "render": "(system.dark) && (1 - accounts.claude.default.session.available)",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-weekly-bar-dark",
+          "name": "Konto 1 weekly bar (dark)",
+          "parent": "row-claude-default",
+          "render": "system.dark",
+          "x": "223",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.claude.default.weekly.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#D97757FF"
+            },
+            "track": {
+              "color": "#4A4A4AFF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-claude-default-weekly-value-dark",
+          "name": "Konto 1 weekly value (dark)",
+          "parent": "row-claude-default",
+          "render": "system.dark",
+          "x": "294",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.default.weekly.display:usage_badge}",
+            "color": {
+              "color": "#F0F0F0FF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-reset-dark",
+          "name": "Konto 1 weekly reset (dark)",
+          "parent": "row-claude-default",
+          "render": "(system.dark) && accounts.claude.default.weekly.available",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.default.weekly.reset.unix:day_2}.{accounts.claude.default.weekly.reset.unix:month_2}. {accounts.claude.default.weekly.reset.unix:time_24}",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-reset-none-dark",
+          "name": "Konto 1 without weekly (dark)",
+          "parent": "row-claude-default",
+          "render": "(system.dark) && (1 - accounts.claude.default.weekly.available)",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-label-light",
+          "name": "Konto 1 label (light)",
+          "parent": "row-claude-default",
+          "render": "1 - system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "62",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Konto 1",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-session-bar-light",
+          "name": "Konto 1 session bar (light)",
+          "parent": "row-claude-default",
+          "render": "1 - system.dark",
+          "x": "62",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.claude.default.session.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#D97757FF"
+            },
+            "track": {
+              "color": "#B8B8B8FF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-claude-default-session-value-light",
+          "name": "Konto 1 session value (light)",
+          "parent": "row-claude-default",
+          "render": "1 - system.dark",
+          "x": "133",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.default.session.display:usage_badge}",
+            "color": {
+              "color": "#1F1F1FFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-session-countdown-light",
+          "name": "Konto 1 5h countdown (light)",
+          "parent": "row-claude-default",
+          "render": "(1 - system.dark) && accounts.claude.default.session.available",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.default.session.reset.seconds:duration}",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-session-countdown-none-light",
+          "name": "Konto 1 5h without countdown (light)",
+          "parent": "row-claude-default",
+          "render": "(1 - system.dark) && (1 - accounts.claude.default.session.available)",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-weekly-bar-light",
+          "name": "Konto 1 weekly bar (light)",
+          "parent": "row-claude-default",
+          "render": "1 - system.dark",
+          "x": "223",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.claude.default.weekly.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#D97757FF"
+            },
+            "track": {
+              "color": "#B8B8B8FF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-claude-default-weekly-value-light",
+          "name": "Konto 1 weekly value (light)",
+          "parent": "row-claude-default",
+          "render": "1 - system.dark",
+          "x": "294",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.default.weekly.display:usage_badge}",
+            "color": {
+              "color": "#1F1F1FFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-reset-light",
+          "name": "Konto 1 weekly reset (light)",
+          "parent": "row-claude-default",
+          "render": "(1 - system.dark) && accounts.claude.default.weekly.available",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.default.weekly.reset.unix:day_2}.{accounts.claude.default.weekly.reset.unix:month_2}. {accounts.claude.default.weekly.reset.unix:time_24}",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-default-reset-none-light",
+          "name": "Konto 1 without weekly (light)",
+          "parent": "row-claude-default",
+          "render": "(1 - system.dark) && (1 - accounts.claude.default.weekly.available)",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab",
+          "name": "Konto 2 row",
+          "parent": "rows",
+          "render": "max(accounts.claude.lab.available, accounts.claude.lab.has_error)",
+          "y": "(max(accounts.claude.default.available, accounts.claude.default.has_error) * (((accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999)) + ((accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999) == (accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999))) + max(accounts.claude.privat.available, accounts.claude.privat.has_error) * ((accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999)) + max(accounts.codex.default.available, accounts.codex.default.has_error) * ((accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999))) * 18",
+          "width": "415",
+          "height": "15"
+        },
+        {
+          "id": "row-claude-lab-label-dark",
+          "name": "Konto 2 label (dark)",
+          "parent": "row-claude-lab",
+          "render": "system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "62",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Konto 2",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-session-bar-dark",
+          "name": "Konto 2 session bar (dark)",
+          "parent": "row-claude-lab",
+          "render": "system.dark",
+          "x": "62",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.claude.lab.session.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#D97757FF"
+            },
+            "track": {
+              "color": "#4A4A4AFF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-claude-lab-session-value-dark",
+          "name": "Konto 2 session value (dark)",
+          "parent": "row-claude-lab",
+          "render": "system.dark",
+          "x": "133",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.lab.session.display:usage_badge}",
+            "color": {
+              "color": "#F0F0F0FF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-session-countdown-dark",
+          "name": "Konto 2 5h countdown (dark)",
+          "parent": "row-claude-lab",
+          "render": "(system.dark) && accounts.claude.lab.session.available",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.lab.session.reset.seconds:duration}",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-session-countdown-none-dark",
+          "name": "Konto 2 5h without countdown (dark)",
+          "parent": "row-claude-lab",
+          "render": "(system.dark) && (1 - accounts.claude.lab.session.available)",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-weekly-bar-dark",
+          "name": "Konto 2 weekly bar (dark)",
+          "parent": "row-claude-lab",
+          "render": "system.dark",
+          "x": "223",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.claude.lab.weekly.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#D97757FF"
+            },
+            "track": {
+              "color": "#4A4A4AFF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-claude-lab-weekly-value-dark",
+          "name": "Konto 2 weekly value (dark)",
+          "parent": "row-claude-lab",
+          "render": "system.dark",
+          "x": "294",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.lab.weekly.display:usage_badge}",
+            "color": {
+              "color": "#F0F0F0FF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-reset-dark",
+          "name": "Konto 2 weekly reset (dark)",
+          "parent": "row-claude-lab",
+          "render": "(system.dark) && accounts.claude.lab.weekly.available",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.lab.weekly.reset.unix:day_2}.{accounts.claude.lab.weekly.reset.unix:month_2}. {accounts.claude.lab.weekly.reset.unix:time_24}",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-reset-none-dark",
+          "name": "Konto 2 without weekly (dark)",
+          "parent": "row-claude-lab",
+          "render": "(system.dark) && (1 - accounts.claude.lab.weekly.available)",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-label-light",
+          "name": "Konto 2 label (light)",
+          "parent": "row-claude-lab",
+          "render": "1 - system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "62",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Konto 2",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-session-bar-light",
+          "name": "Konto 2 session bar (light)",
+          "parent": "row-claude-lab",
+          "render": "1 - system.dark",
+          "x": "62",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.claude.lab.session.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#D97757FF"
+            },
+            "track": {
+              "color": "#B8B8B8FF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-claude-lab-session-value-light",
+          "name": "Konto 2 session value (light)",
+          "parent": "row-claude-lab",
+          "render": "1 - system.dark",
+          "x": "133",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.lab.session.display:usage_badge}",
+            "color": {
+              "color": "#1F1F1FFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-session-countdown-light",
+          "name": "Konto 2 5h countdown (light)",
+          "parent": "row-claude-lab",
+          "render": "(1 - system.dark) && accounts.claude.lab.session.available",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.lab.session.reset.seconds:duration}",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-session-countdown-none-light",
+          "name": "Konto 2 5h without countdown (light)",
+          "parent": "row-claude-lab",
+          "render": "(1 - system.dark) && (1 - accounts.claude.lab.session.available)",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-weekly-bar-light",
+          "name": "Konto 2 weekly bar (light)",
+          "parent": "row-claude-lab",
+          "render": "1 - system.dark",
+          "x": "223",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.claude.lab.weekly.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#D97757FF"
+            },
+            "track": {
+              "color": "#B8B8B8FF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-claude-lab-weekly-value-light",
+          "name": "Konto 2 weekly value (light)",
+          "parent": "row-claude-lab",
+          "render": "1 - system.dark",
+          "x": "294",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.lab.weekly.display:usage_badge}",
+            "color": {
+              "color": "#1F1F1FFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-reset-light",
+          "name": "Konto 2 weekly reset (light)",
+          "parent": "row-claude-lab",
+          "render": "(1 - system.dark) && accounts.claude.lab.weekly.available",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.lab.weekly.reset.unix:day_2}.{accounts.claude.lab.weekly.reset.unix:month_2}. {accounts.claude.lab.weekly.reset.unix:time_24}",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-lab-reset-none-light",
+          "name": "Konto 2 without weekly (light)",
+          "parent": "row-claude-lab",
+          "render": "(1 - system.dark) && (1 - accounts.claude.lab.weekly.available)",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat",
+          "name": "Konto 3 row",
+          "parent": "rows",
+          "render": "max(accounts.claude.privat.available, accounts.claude.privat.has_error)",
+          "y": "(max(accounts.claude.default.available, accounts.claude.default.has_error) * (((accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999)) + ((accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999) == (accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999))) + max(accounts.claude.lab.available, accounts.claude.lab.has_error) * (((accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999)) + ((accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999) == (accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999))) + max(accounts.codex.default.available, accounts.codex.default.has_error) * ((accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999))) * 18",
+          "width": "415",
+          "height": "15"
+        },
+        {
+          "id": "row-claude-privat-label-dark",
+          "name": "Konto 3 label (dark)",
+          "parent": "row-claude-privat",
+          "render": "system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "62",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Konto 3",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-session-bar-dark",
+          "name": "Konto 3 session bar (dark)",
+          "parent": "row-claude-privat",
+          "render": "system.dark",
+          "x": "62",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.claude.privat.session.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#D97757FF"
+            },
+            "track": {
+              "color": "#4A4A4AFF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-claude-privat-session-value-dark",
+          "name": "Konto 3 session value (dark)",
+          "parent": "row-claude-privat",
+          "render": "system.dark",
+          "x": "133",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.privat.session.display:usage_badge}",
+            "color": {
+              "color": "#F0F0F0FF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-session-countdown-dark",
+          "name": "Konto 3 5h countdown (dark)",
+          "parent": "row-claude-privat",
+          "render": "(system.dark) && accounts.claude.privat.session.available",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.privat.session.reset.seconds:duration}",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-session-countdown-none-dark",
+          "name": "Konto 3 5h without countdown (dark)",
+          "parent": "row-claude-privat",
+          "render": "(system.dark) && (1 - accounts.claude.privat.session.available)",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-weekly-bar-dark",
+          "name": "Konto 3 weekly bar (dark)",
+          "parent": "row-claude-privat",
+          "render": "system.dark",
+          "x": "223",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.claude.privat.weekly.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#D97757FF"
+            },
+            "track": {
+              "color": "#4A4A4AFF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-claude-privat-weekly-value-dark",
+          "name": "Konto 3 weekly value (dark)",
+          "parent": "row-claude-privat",
+          "render": "system.dark",
+          "x": "294",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.privat.weekly.display:usage_badge}",
+            "color": {
+              "color": "#F0F0F0FF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-reset-dark",
+          "name": "Konto 3 weekly reset (dark)",
+          "parent": "row-claude-privat",
+          "render": "(system.dark) && accounts.claude.privat.weekly.available",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.privat.weekly.reset.unix:day_2}.{accounts.claude.privat.weekly.reset.unix:month_2}. {accounts.claude.privat.weekly.reset.unix:time_24}",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-reset-none-dark",
+          "name": "Konto 3 without weekly (dark)",
+          "parent": "row-claude-privat",
+          "render": "(system.dark) && (1 - accounts.claude.privat.weekly.available)",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-label-light",
+          "name": "Konto 3 label (light)",
+          "parent": "row-claude-privat",
+          "render": "1 - system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "62",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Konto 3",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-session-bar-light",
+          "name": "Konto 3 session bar (light)",
+          "parent": "row-claude-privat",
+          "render": "1 - system.dark",
+          "x": "62",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.claude.privat.session.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#D97757FF"
+            },
+            "track": {
+              "color": "#B8B8B8FF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-claude-privat-session-value-light",
+          "name": "Konto 3 session value (light)",
+          "parent": "row-claude-privat",
+          "render": "1 - system.dark",
+          "x": "133",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.privat.session.display:usage_badge}",
+            "color": {
+              "color": "#1F1F1FFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-session-countdown-light",
+          "name": "Konto 3 5h countdown (light)",
+          "parent": "row-claude-privat",
+          "render": "(1 - system.dark) && accounts.claude.privat.session.available",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.privat.session.reset.seconds:duration}",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-session-countdown-none-light",
+          "name": "Konto 3 5h without countdown (light)",
+          "parent": "row-claude-privat",
+          "render": "(1 - system.dark) && (1 - accounts.claude.privat.session.available)",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-weekly-bar-light",
+          "name": "Konto 3 weekly bar (light)",
+          "parent": "row-claude-privat",
+          "render": "1 - system.dark",
+          "x": "223",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.claude.privat.weekly.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#D97757FF"
+            },
+            "track": {
+              "color": "#B8B8B8FF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-claude-privat-weekly-value-light",
+          "name": "Konto 3 weekly value (light)",
+          "parent": "row-claude-privat",
+          "render": "1 - system.dark",
+          "x": "294",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.privat.weekly.display:usage_badge}",
+            "color": {
+              "color": "#1F1F1FFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-reset-light",
+          "name": "Konto 3 weekly reset (light)",
+          "parent": "row-claude-privat",
+          "render": "(1 - system.dark) && accounts.claude.privat.weekly.available",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.claude.privat.weekly.reset.unix:day_2}.{accounts.claude.privat.weekly.reset.unix:month_2}. {accounts.claude.privat.weekly.reset.unix:time_24}",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-claude-privat-reset-none-light",
+          "name": "Konto 3 without weekly (light)",
+          "parent": "row-claude-privat",
+          "render": "(1 - system.dark) && (1 - accounts.claude.privat.weekly.available)",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default",
+          "name": "Codex row",
+          "parent": "rows",
+          "render": "max(accounts.codex.default.available, accounts.codex.default.has_error)",
+          "y": "(max(accounts.claude.default.available, accounts.claude.default.has_error) * (((accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999) < (accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999)) + ((accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999) == (accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999))) + max(accounts.claude.lab.available, accounts.claude.lab.has_error) * (((accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999) < (accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999)) + ((accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999) == (accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999))) + max(accounts.claude.privat.available, accounts.claude.privat.has_error) * (((accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999) < (accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999)) + ((accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999) == (accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999)))) * 18",
+          "width": "415",
+          "height": "15"
+        },
+        {
+          "id": "row-codex-default-label-dark",
+          "name": "Codex label (dark)",
+          "parent": "row-codex-default",
+          "render": "system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "62",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Codex",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-session-bar-dark",
+          "name": "Codex session bar (dark)",
+          "parent": "row-codex-default",
+          "render": "system.dark",
+          "x": "62",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.codex.default.session.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#F5F5F5FF"
+            },
+            "track": {
+              "color": "#4A4A4AFF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-codex-default-session-value-dark",
+          "name": "Codex session value (dark)",
+          "parent": "row-codex-default",
+          "render": "system.dark",
+          "x": "133",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.codex.default.session.display:usage_badge}",
+            "color": {
+              "color": "#F0F0F0FF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-session-countdown-dark",
+          "name": "Codex 5h countdown (dark)",
+          "parent": "row-codex-default",
+          "render": "(system.dark) && accounts.codex.default.session.available",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.codex.default.session.reset.seconds:duration}",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-session-countdown-none-dark",
+          "name": "Codex 5h without countdown (dark)",
+          "parent": "row-codex-default",
+          "render": "(system.dark) && (1 - accounts.codex.default.session.available)",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-weekly-bar-dark",
+          "name": "Codex weekly bar (dark)",
+          "parent": "row-codex-default",
+          "render": "system.dark",
+          "x": "223",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.codex.default.weekly.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#F5F5F5FF"
+            },
+            "track": {
+              "color": "#4A4A4AFF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-codex-default-weekly-value-dark",
+          "name": "Codex weekly value (dark)",
+          "parent": "row-codex-default",
+          "render": "system.dark",
+          "x": "294",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.codex.default.weekly.display:usage_badge}",
+            "color": {
+              "color": "#F0F0F0FF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-reset-dark",
+          "name": "Codex weekly reset (dark)",
+          "parent": "row-codex-default",
+          "render": "(system.dark) && accounts.codex.default.weekly.available",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.codex.default.weekly.reset.unix:day_2}.{accounts.codex.default.weekly.reset.unix:month_2}. {accounts.codex.default.weekly.reset.unix:time_24}",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-reset-none-dark",
+          "name": "Codex without weekly (dark)",
+          "parent": "row-codex-default",
+          "render": "(system.dark) && (1 - accounts.codex.default.weekly.available)",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#9A9A9AFF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-label-light",
+          "name": "Codex label (light)",
+          "parent": "row-codex-default",
+          "render": "1 - system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "62",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Codex",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-session-bar-light",
+          "name": "Codex session bar (light)",
+          "parent": "row-codex-default",
+          "render": "1 - system.dark",
+          "x": "62",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.codex.default.session.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#F5F5F5FF"
+            },
+            "track": {
+              "color": "#B8B8B8FF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-codex-default-session-value-light",
+          "name": "Codex session value (light)",
+          "parent": "row-codex-default",
+          "render": "1 - system.dark",
+          "x": "133",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.codex.default.session.display:usage_badge}",
+            "color": {
+              "color": "#1F1F1FFF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-session-countdown-light",
+          "name": "Codex 5h countdown (light)",
+          "parent": "row-codex-default",
+          "render": "(1 - system.dark) && accounts.codex.default.session.available",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.codex.default.session.reset.seconds:duration}",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-session-countdown-none-light",
+          "name": "Codex 5h without countdown (light)",
+          "parent": "row-codex-default",
+          "render": "(1 - system.dark) && (1 - accounts.codex.default.session.available)",
+          "x": "172",
+          "y": "1",
+          "width": "46",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-weekly-bar-light",
+          "name": "Codex weekly bar (light)",
+          "parent": "row-codex-default",
+          "render": "1 - system.dark",
+          "x": "223",
+          "y": "2",
+          "width": "66",
+          "height": "11",
+          "content": {
+            "type": "progress",
+            "value": "accounts.codex.default.weekly.display",
+            "direction": "left_to_right",
+            "fill": {
+              "color": "#F5F5F5FF"
+            },
+            "track": {
+              "color": "#B8B8B8FF"
+            },
+            "corner_radius": "2",
+            "segments": 6,
+            "segment_gap": "1"
+          }
+        },
+        {
+          "id": "row-codex-default-weekly-value-light",
+          "name": "Codex weekly value (light)",
+          "parent": "row-codex-default",
+          "render": "1 - system.dark",
+          "x": "294",
+          "y": "1",
+          "width": "34",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.codex.default.weekly.display:usage_badge}",
+            "color": {
+              "color": "#1F1F1FFF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-reset-light",
+          "name": "Codex weekly reset (light)",
+          "parent": "row-codex-default",
+          "render": "(1 - system.dark) && accounts.codex.default.weekly.available",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "{accounts.codex.default.weekly.reset.unix:day_2}.{accounts.codex.default.weekly.reset.unix:month_2}. {accounts.codex.default.weekly.reset.unix:time_24}",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "row-codex-default-reset-none-light",
+          "name": "Codex without weekly (light)",
+          "parent": "row-codex-default",
+          "render": "(1 - system.dark) && (1 - accounts.codex.default.weekly.available)",
+          "x": "333",
+          "y": "1",
+          "width": "82",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "\u2014",
+            "color": {
+              "color": "#5A5A5AFF"
+            }
+          }
+        },
+        {
+          "id": "reset-overlay",
+          "name": "Reset times",
+          "render": "0",
+          "x": "0",
+          "y": "0",
+          "width": "canvas.width",
+          "height": "canvas.height"
+        },
+        {
+          "id": "reset-overlay-backdrop-dark",
+          "name": "Reset backdrop (dark)",
+          "parent": "reset-overlay",
+          "render": "system.dark",
+          "x": "0",
+          "y": "0",
+          "width": "canvas.width",
+          "height": "canvas.height",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#1E1E1EFF"
+            }
+          },
+          "corner_radius": "6"
+        },
+        {
+          "id": "reset-overlay-backdrop-light",
+          "name": "Reset backdrop (light)",
+          "parent": "reset-overlay",
+          "render": "1 - system.dark",
+          "x": "0",
+          "y": "0",
+          "width": "canvas.width",
+          "height": "canvas.height",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FAFAFAFF"
+            }
+          },
+          "corner_radius": "6"
+        },
+        {
+          "id": "reset-rows",
+          "name": "Reset lines",
+          "parent": "reset-overlay",
+          "x": "8",
+          "y": "5",
+          "width": "415",
+          "height": "canvas.height - 10"
+        },
+        {
+          "id": "reset-row-claude-default",
+          "name": "Konto 1 reset row",
+          "parent": "reset-rows",
+          "render": "max(accounts.claude.default.available, accounts.claude.default.has_error)",
+          "y": "(max(accounts.claude.lab.available, accounts.claude.lab.has_error) * ((accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999)) + max(accounts.claude.privat.available, accounts.claude.privat.has_error) * ((accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999)) + max(accounts.codex.default.available, accounts.codex.default.has_error) * ((accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999))) * 18",
+          "width": "415",
+          "height": "15"
+        },
+        {
+          "id": "reset-row-claude-default-dark",
+          "name": "Konto 1 resets (dark)",
+          "parent": "reset-row-claude-default",
+          "render": "system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "415",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Konto 1:  5h {accounts.claude.default.session.display:usage_reset_line}   7d {accounts.claude.default.weekly.display:usage_reset_line}",
+            "color": {
+              "color": "#E8E8E8FF"
+            }
+          }
+        },
+        {
+          "id": "reset-row-claude-default-light",
+          "name": "Konto 1 resets (light)",
+          "parent": "reset-row-claude-default",
+          "render": "1 - system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "415",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Konto 1:  5h {accounts.claude.default.session.display:usage_reset_line}   7d {accounts.claude.default.weekly.display:usage_reset_line}",
+            "color": {
+              "color": "#1F1F1FFF"
+            }
+          }
+        },
+        {
+          "id": "reset-row-claude-lab",
+          "name": "Konto 2 reset row",
+          "parent": "reset-rows",
+          "render": "max(accounts.claude.lab.available, accounts.claude.lab.has_error)",
+          "y": "(max(accounts.claude.default.available, accounts.claude.default.has_error) * (((accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999)) + ((accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999) == (accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999))) + max(accounts.claude.privat.available, accounts.claude.privat.has_error) * ((accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999)) + max(accounts.codex.default.available, accounts.codex.default.has_error) * ((accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999))) * 18",
+          "width": "415",
+          "height": "15"
+        },
+        {
+          "id": "reset-row-claude-lab-dark",
+          "name": "Konto 2 resets (dark)",
+          "parent": "reset-row-claude-lab",
+          "render": "system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "415",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Konto 2:  5h {accounts.claude.lab.session.display:usage_reset_line}   7d {accounts.claude.lab.weekly.display:usage_reset_line}",
+            "color": {
+              "color": "#E8E8E8FF"
+            }
+          }
+        },
+        {
+          "id": "reset-row-claude-lab-light",
+          "name": "Konto 2 resets (light)",
+          "parent": "reset-row-claude-lab",
+          "render": "1 - system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "415",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Konto 2:  5h {accounts.claude.lab.session.display:usage_reset_line}   7d {accounts.claude.lab.weekly.display:usage_reset_line}",
+            "color": {
+              "color": "#1F1F1FFF"
+            }
+          }
+        },
+        {
+          "id": "reset-row-claude-privat",
+          "name": "Konto 3 reset row",
+          "parent": "reset-rows",
+          "render": "max(accounts.claude.privat.available, accounts.claude.privat.has_error)",
+          "y": "(max(accounts.claude.default.available, accounts.claude.default.has_error) * (((accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999)) + ((accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999) == (accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999))) + max(accounts.claude.lab.available, accounts.claude.lab.has_error) * (((accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999)) + ((accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999) == (accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999))) + max(accounts.codex.default.available, accounts.codex.default.has_error) * ((accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999) < (accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999))) * 18",
+          "width": "415",
+          "height": "15"
+        },
+        {
+          "id": "reset-row-claude-privat-dark",
+          "name": "Konto 3 resets (dark)",
+          "parent": "reset-row-claude-privat",
+          "render": "system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "415",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Konto 3:  5h {accounts.claude.privat.session.display:usage_reset_line}   7d {accounts.claude.privat.weekly.display:usage_reset_line}",
+            "color": {
+              "color": "#E8E8E8FF"
+            }
+          }
+        },
+        {
+          "id": "reset-row-claude-privat-light",
+          "name": "Konto 3 resets (light)",
+          "parent": "reset-row-claude-privat",
+          "render": "1 - system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "415",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Konto 3:  5h {accounts.claude.privat.session.display:usage_reset_line}   7d {accounts.claude.privat.weekly.display:usage_reset_line}",
+            "color": {
+              "color": "#1F1F1FFF"
+            }
+          }
+        },
+        {
+          "id": "reset-row-codex-default",
+          "name": "Codex reset row",
+          "parent": "reset-rows",
+          "render": "max(accounts.codex.default.available, accounts.codex.default.has_error)",
+          "y": "(max(accounts.claude.default.available, accounts.claude.default.has_error) * (((accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999) < (accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999)) + ((accounts.claude.default.weekly.reset.unix + (accounts.claude.default.weekly.reset.unix <= 0) * 99999999999) == (accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999))) + max(accounts.claude.lab.available, accounts.claude.lab.has_error) * (((accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999) < (accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999)) + ((accounts.claude.lab.weekly.reset.unix + (accounts.claude.lab.weekly.reset.unix <= 0) * 99999999999) == (accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999))) + max(accounts.claude.privat.available, accounts.claude.privat.has_error) * (((accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999) < (accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999)) + ((accounts.claude.privat.weekly.reset.unix + (accounts.claude.privat.weekly.reset.unix <= 0) * 99999999999) == (accounts.codex.default.weekly.reset.unix + (accounts.codex.default.weekly.reset.unix <= 0) * 99999999999)))) * 18",
+          "width": "415",
+          "height": "15"
+        },
+        {
+          "id": "reset-row-codex-default-dark",
+          "name": "Codex resets (dark)",
+          "parent": "reset-row-codex-default",
+          "render": "system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "415",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Codex:  5h {accounts.codex.default.session.display:usage_reset_line}   7d {accounts.codex.default.weekly.display:usage_reset_line}",
+            "color": {
+              "color": "#E8E8E8FF"
+            }
+          }
+        },
+        {
+          "id": "reset-row-codex-default-light",
+          "name": "Codex resets (light)",
+          "parent": "reset-row-codex-default",
+          "render": "1 - system.dark",
+          "x": "0",
+          "y": "1",
+          "width": "415",
+          "height": "13",
+          "content": {
+            "font_family": "Segoe UI",
+            "font_size": "12",
+            "weight": "medium",
+            "rendering": "clear_type",
+            "contrast": "1",
+            "align": "left",
+            "type": "text",
+            "template": "Codex:  5h {accounts.codex.default.session.display:usage_reset_line}   7d {accounts.codex.default.weekly.display:usage_reset_line}",
+            "color": {
+              "color": "#1F1F1FFF"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "claude-tray-icon",
+      "name": "Claude Code usage",
+      "render": "providers.claude.enabled",
+      "mouse_events": {
+        "click": "toggle(\"main\", render)",
+        "double_click": "toggle(\"main\", render)",
+        "right_click": "show_context_menu(\"classic-v1\")"
+      },
+      "placement": {
+        "nest": "tray_icon"
+      },
+      "width": "64",
+      "height": "64",
+      "background": {
+        "type": "colour",
+        "colour": {
+          "color": "#D97757FF"
+        }
+      },
+      "corner_radius": "1",
+      "children": [
+        {
+          "id": "claude-tray-70-color",
+          "name": "Claude 50 to 70 percent colour transition",
+          "render": "claude.headline.percentage > 50",
+          "parent": "claude-tray-icon",
+          "width": "64",
+          "height": "64",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#D08540FF",
+              "opacity": "clamp((claude.session.percentage - 50) / 20, 0, 1)"
+            }
+          },
+          "corner_radius": "1"
+        },
+        {
+          "id": "claude-tray-85-color",
+          "name": "Claude 70 to 85 percent colour transition",
+          "render": "claude.headline.percentage > 70",
+          "parent": "claude-tray-icon",
+          "width": "64",
+          "height": "64",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#CC8C20FF",
+              "opacity": "clamp((claude.session.percentage - 70) / 15, 0, 1)"
+            }
+          },
+          "corner_radius": "1"
+        },
+        {
+          "id": "claude-tray-95-color",
+          "name": "Claude 85 to 95 percent colour transition",
+          "render": "claude.headline.percentage > 85",
+          "parent": "claude-tray-icon",
+          "width": "64",
+          "height": "64",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#C45020FF",
+              "opacity": "clamp((claude.session.percentage - 85) / 10, 0, 1)"
+            }
+          },
+          "corner_radius": "1"
+        },
+        {
+          "id": "claude-tray-100-color",
+          "name": "Claude 95 to 100 percent colour transition",
+          "render": "claude.headline.percentage > 95",
+          "parent": "claude-tray-icon",
+          "width": "64",
+          "height": "64",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#B82020FF",
+              "opacity": "clamp((claude.session.percentage - 95) / 5, 0, 1)"
+            }
+          },
+          "corner_radius": "1"
+        },
+        {
+          "id": "claude-tray-session-value",
+          "name": "claude 5h percentage",
+          "render": "data.poll_ok && claude.available && claude.credits.available == 0",
+          "parent": "claude-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{claude.session.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "claude-tray-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && claude.available && claude.credits.available == 0",
+          "parent": "claude-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFF99"
+            }
+          }
+        },
+        {
+          "id": "claude-tray-weekly-value",
+          "name": "claude 7d percentage",
+          "render": "data.poll_ok && claude.available && claude.credits.available == 0",
+          "parent": "claude-tray-icon",
+          "x": "0",
+          "y": "33",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{claude.weekly.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "claude-tray-credit-one-digit",
+          "name": "claude credit balance badge",
+          "render": "data.poll_ok && claude.available && claude.credits.available && claude.credits.balance < 9.5",
+          "parent": "claude-tray-icon",
+          "width": "64",
+          "height": "64",
+          "content": {
+            "type": "text",
+            "template": "{claude.credits.balance:0}",
+            "font_family": "Arial Bold",
+            "font_size": "50",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "claude-tray-credit-two-digits",
+          "name": "claude credit balance badge",
+          "render": "data.poll_ok && claude.available && claude.credits.available && claude.credits.balance >= 9.5 && claude.credits.balance < 99.5",
+          "parent": "claude-tray-icon",
+          "width": "64",
+          "height": "64",
+          "content": {
+            "type": "text",
+            "template": "{claude.credits.balance:0}",
+            "font_family": "Arial Bold",
+            "font_size": "42",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "claude-tray-credit-three-digits",
+          "name": "claude credit balance badge",
+          "render": "data.poll_ok && claude.available && claude.credits.available && claude.credits.balance >= 99.5 && claude.credits.balance < 999.5",
+          "parent": "claude-tray-icon",
+          "width": "64",
+          "height": "64",
+          "content": {
+            "type": "text",
+            "template": "{claude.credits.balance:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "claude-tray-credit-thousands",
+          "name": "claude credit balance badge",
+          "render": "data.poll_ok && claude.available && claude.credits.available && claude.credits.balance >= 999.5",
+          "parent": "claude-tray-icon",
+          "width": "64",
+          "height": "64",
+          "content": {
+            "type": "text",
+            "template": "{claude.credits.balance / 1000:0.0}k",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "codex-tray-icon",
+      "name": "Codex usage",
+      "render": "providers.codex.enabled",
+      "mouse_events": {
+        "click": "toggle(\"main\", render)",
+        "double_click": "toggle(\"main\", render)",
+        "right_click": "show_context_menu(\"classic-v1\")"
+      },
+      "placement": {
+        "nest": "tray_icon"
+      },
+      "width": "64",
+      "height": "64",
+      "background": {
+        "type": "colour",
+        "colour": {
+          "color": "#FFFFFFFF"
+        }
+      },
+      "corner_radius": "3",
+      "children": [
+        {
+          "id": "codex-tray-high-outline",
+          "name": "Codex high-usage dark outline",
+          "render": "codex.headline.percentage >= 90",
+          "parent": "codex-tray-icon",
+          "width": "64",
+          "height": "64",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#111111FF"
+            }
+          },
+          "corner_radius": "3"
+        },
+        {
+          "id": "codex-tray-low-fill",
+          "name": "Codex normal dark fill",
+          "render": "codex.headline.percentage < 90",
+          "parent": "codex-tray-icon",
+          "x": "3",
+          "y": "3",
+          "width": "58",
+          "height": "58",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#111111FF"
+            }
+          },
+          "corner_radius": "1"
+        },
+        {
+          "id": "codex-tray-high-fill",
+          "name": "Codex high-usage white fill",
+          "render": "codex.headline.percentage >= 90",
+          "parent": "codex-tray-icon",
+          "x": "3",
+          "y": "3",
+          "width": "58",
+          "height": "58",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFFFF"
+            }
+          },
+          "corner_radius": "1"
+        },
+        {
+          "id": "codex-tray-placeholder",
+          "name": "Codex loading placeholder",
+          "render": "data.poll_ok == 0 || codex.available == 0",
+          "parent": "codex-tray-icon",
+          "width": "64",
+          "height": "64",
+          "content": {
+            "type": "text",
+            "template": "C",
+            "font_family": "Arial Bold",
+            "font_size": "50",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "codex-tray-low-session-value",
+          "name": "codex 5h percentage",
+          "render": "(data.poll_ok && codex.available && codex.headline.percentage < 90) && codex.credits.available == 0",
+          "parent": "codex-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{codex.five_hour.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "codex-tray-low-divider",
+          "name": "window divider",
+          "render": "(data.poll_ok && codex.available && codex.headline.percentage < 90) && codex.credits.available == 0",
+          "parent": "codex-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFF99"
+            }
+          }
+        },
+        {
+          "id": "codex-tray-low-weekly-value",
+          "name": "codex 7d percentage",
+          "render": "(data.poll_ok && codex.available && codex.headline.percentage < 90) && codex.credits.available == 0",
+          "parent": "codex-tray-icon",
+          "x": "0",
+          "y": "33",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{codex.weekly.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "codex-tray-high-session-value",
+          "name": "codex 5h percentage",
+          "render": "(data.poll_ok && codex.available && codex.headline.percentage >= 90) && codex.credits.available == 0",
+          "parent": "codex-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{codex.five_hour.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#111111FF"
+            }
+          }
+        },
+        {
+          "id": "codex-tray-high-divider",
+          "name": "window divider",
+          "render": "(data.poll_ok && codex.available && codex.headline.percentage >= 90) && codex.credits.available == 0",
+          "parent": "codex-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#11111199"
+            }
+          }
+        },
+        {
+          "id": "codex-tray-high-weekly-value",
+          "name": "codex 7d percentage",
+          "render": "(data.poll_ok && codex.available && codex.headline.percentage >= 90) && codex.credits.available == 0",
+          "parent": "codex-tray-icon",
+          "x": "0",
+          "y": "33",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{codex.weekly.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#111111FF"
+            }
+          }
+        },
+        {
+          "id": "codex-tray-credit-one-digit",
+          "name": "codex credit balance badge",
+          "render": "data.poll_ok && codex.available && codex.credits.available && codex.credits.balance < 9.5",
+          "parent": "codex-tray-icon",
+          "width": "64",
+          "height": "64",
+          "content": {
+            "type": "text",
+            "template": "{codex.credits.balance:0}",
+            "font_family": "Arial Bold",
+            "font_size": "50",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "codex-tray-credit-two-digits",
+          "name": "codex credit balance badge",
+          "render": "data.poll_ok && codex.available && codex.credits.available && codex.credits.balance >= 9.5 && codex.credits.balance < 99.5",
+          "parent": "codex-tray-icon",
+          "width": "64",
+          "height": "64",
+          "content": {
+            "type": "text",
+            "template": "{codex.credits.balance:0}",
+            "font_family": "Arial Bold",
+            "font_size": "42",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "codex-tray-credit-three-digits",
+          "name": "codex credit balance badge",
+          "render": "data.poll_ok && codex.available && codex.credits.available && codex.credits.balance >= 99.5 && codex.credits.balance < 999.5",
+          "parent": "codex-tray-icon",
+          "width": "64",
+          "height": "64",
+          "content": {
+            "type": "text",
+            "template": "{codex.credits.balance:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#111111FF"
+            }
+          }
+        },
+        {
+          "id": "codex-tray-credit-thousands",
+          "name": "codex credit balance badge",
+          "render": "data.poll_ok && codex.available && codex.credits.available && codex.credits.balance >= 999.5",
+          "parent": "codex-tray-icon",
+          "width": "64",
+          "height": "64",
+          "content": {
+            "type": "text",
+            "template": "{codex.credits.balance / 1000:0.0}k",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#111111FF"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "antigravity-tray-icon",
+      "name": "Antigravity usage",
+      "render": "providers.antigravity.enabled",
+      "mouse_events": {
+        "click": "toggle(\"main\", render)",
+        "double_click": "toggle(\"main\", render)",
+        "right_click": "show_context_menu(\"classic-v1\")"
+      },
+      "placement": {
+        "nest": "tray_icon"
+      },
+      "width": "64",
+      "height": "64",
+      "background": {
+        "type": "colour",
+        "colour": {
+          "color": "#FFFFFFFF"
+        }
+      },
+      "corner_radius": "3",
+      "children": [
+        {
+          "id": "antigravity-tray-high-outline",
+          "name": "Antigravity high-usage blue outline",
+          "render": "antigravity.headline.percentage >= 90",
+          "parent": "antigravity-tray-icon",
+          "width": "64",
+          "height": "64",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#1967D2FF"
+            }
+          },
+          "corner_radius": "3"
+        },
+        {
+          "id": "antigravity-tray-low-fill",
+          "name": "Antigravity normal blue fill",
+          "render": "antigravity.headline.percentage < 90",
+          "parent": "antigravity-tray-icon",
+          "x": "3",
+          "y": "3",
+          "width": "58",
+          "height": "58",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#4285F4FF"
+            }
+          },
+          "corner_radius": "1"
+        },
+        {
+          "id": "antigravity-tray-high-fill",
+          "name": "Antigravity high-usage white fill",
+          "render": "antigravity.headline.percentage >= 90",
+          "parent": "antigravity-tray-icon",
+          "x": "3",
+          "y": "3",
+          "width": "58",
+          "height": "58",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFFFF"
+            }
+          },
+          "corner_radius": "1"
+        },
+        {
+          "id": "antigravity-tray-placeholder",
+          "name": "Antigravity loading placeholder",
+          "render": "data.poll_ok == 0 || antigravity.available == 0",
+          "parent": "antigravity-tray-icon",
+          "width": "64",
+          "height": "64",
+          "content": {
+            "type": "text",
+            "template": "A",
+            "font_family": "Arial Bold",
+            "font_size": "50",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "antigravity-tray-low-session-value",
+          "name": "antigravity 5h percentage",
+          "render": "data.poll_ok && antigravity.available && antigravity.headline.percentage < 90",
+          "parent": "antigravity-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{antigravity.session.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "antigravity-tray-low-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && antigravity.available && antigravity.headline.percentage < 90",
+          "parent": "antigravity-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFF99"
+            }
+          }
+        },
+        {
+          "id": "antigravity-tray-low-weekly-value",
+          "name": "antigravity 7d percentage",
+          "render": "data.poll_ok && antigravity.available && antigravity.headline.percentage < 90",
+          "parent": "antigravity-tray-icon",
+          "x": "0",
+          "y": "33",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{antigravity.weekly.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "antigravity-tray-high-session-value",
+          "name": "antigravity 5h percentage",
+          "render": "data.poll_ok && antigravity.available && antigravity.headline.percentage >= 90",
+          "parent": "antigravity-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{antigravity.session.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#1967D2FF"
+            }
+          }
+        },
+        {
+          "id": "antigravity-tray-high-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && antigravity.available && antigravity.headline.percentage >= 90",
+          "parent": "antigravity-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#1967D299"
+            }
+          }
+        },
+        {
+          "id": "antigravity-tray-high-weekly-value",
+          "name": "antigravity 7d percentage",
+          "render": "data.poll_ok && antigravity.available && antigravity.headline.percentage >= 90",
+          "parent": "antigravity-tray-icon",
+          "x": "0",
+          "y": "33",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{antigravity.weekly.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#1967D2FF"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "cursor-tray-icon",
+      "name": "Cursor usage",
+      "render": "providers.cursor.enabled",
+      "mouse_events": {
+        "click": "toggle(\"main\", render)",
+        "double_click": "toggle(\"main\", render)",
+        "right_click": "show_context_menu(\"classic-v1\")"
+      },
+      "placement": {
+        "nest": "tray_icon"
+      },
+      "width": "64",
+      "height": "64",
+      "background": {
+        "type": "colour",
+        "colour": {
+          "color": "#FFFFFFFF"
+        }
+      },
+      "corner_radius": "3",
+      "children": [
+        {
+          "id": "cursor-tray-high-outline",
+          "name": "Cursor high-usage black outline",
+          "render": "cursor.headline.percentage >= 90",
+          "parent": "cursor-tray-icon",
+          "width": "64",
+          "height": "64",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#1A1A1AFF"
+            }
+          },
+          "corner_radius": "3"
+        },
+        {
+          "id": "cursor-tray-low-fill",
+          "name": "Cursor normal black fill",
+          "render": "cursor.headline.percentage < 90",
+          "parent": "cursor-tray-icon",
+          "x": "3",
+          "y": "3",
+          "width": "58",
+          "height": "58",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#1A1A1AFF"
+            }
+          },
+          "corner_radius": "1"
+        },
+        {
+          "id": "cursor-tray-high-fill",
+          "name": "Cursor high-usage white fill",
+          "render": "cursor.headline.percentage >= 90",
+          "parent": "cursor-tray-icon",
+          "x": "3",
+          "y": "3",
+          "width": "58",
+          "height": "58",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFFFF"
+            }
+          },
+          "corner_radius": "1"
+        },
+        {
+          "id": "cursor-tray-placeholder",
+          "name": "Cursor loading placeholder",
+          "render": "data.poll_ok == 0 || cursor.available == 0",
+          "parent": "cursor-tray-icon",
+          "width": "64",
+          "height": "64",
+          "content": {
+            "type": "text",
+            "template": "Cu",
+            "font_family": "Arial Bold",
+            "font_size": "34",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "cursor-tray-low-session-value",
+          "name": "cursor 5h percentage",
+          "render": "data.poll_ok && cursor.available && cursor.headline.percentage < 90",
+          "parent": "cursor-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{cursor.session.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "cursor-tray-low-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && cursor.available && cursor.headline.percentage < 90",
+          "parent": "cursor-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFF99"
+            }
+          }
+        },
+        {
+          "id": "cursor-tray-low-weekly-value",
+          "name": "cursor 7d percentage",
+          "render": "data.poll_ok && cursor.available && cursor.headline.percentage < 90",
+          "parent": "cursor-tray-icon",
+          "x": "0",
+          "y": "33",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{cursor.weekly.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "cursor-tray-high-session-value",
+          "name": "cursor 5h percentage",
+          "render": "data.poll_ok && cursor.available && cursor.headline.percentage >= 90",
+          "parent": "cursor-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{cursor.session.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#1A1A1AFF"
+            }
+          }
+        },
+        {
+          "id": "cursor-tray-high-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && cursor.available && cursor.headline.percentage >= 90",
+          "parent": "cursor-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#1A1A1A99"
+            }
+          }
+        },
+        {
+          "id": "cursor-tray-high-weekly-value",
+          "name": "cursor 7d percentage",
+          "render": "data.poll_ok && cursor.available && cursor.headline.percentage >= 90",
+          "parent": "cursor-tray-icon",
+          "x": "0",
+          "y": "33",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{cursor.weekly.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#1A1A1AFF"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "opencode-tray-icon",
+      "name": "OpenCode usage",
+      "render": "providers.opencode.enabled",
+      "mouse_events": {
+        "click": "toggle(\"main\", render)",
+        "double_click": "toggle(\"main\", render)",
+        "right_click": "show_context_menu(\"classic-v1\")"
+      },
+      "placement": {
+        "nest": "tray_icon"
+      },
+      "width": "64",
+      "height": "64",
+      "background": {
+        "type": "colour",
+        "colour": {
+          "color": "#FFFFFFFF"
+        }
+      },
+      "corner_radius": "3",
+      "children": [
+        {
+          "id": "opencode-tray-high-outline",
+          "name": "OpenCode high-usage green outline",
+          "render": "opencode.headline.percentage >= 90",
+          "parent": "opencode-tray-icon",
+          "width": "64",
+          "height": "64",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#1B5E20FF"
+            }
+          },
+          "corner_radius": "3"
+        },
+        {
+          "id": "opencode-tray-low-fill",
+          "name": "OpenCode normal green fill",
+          "render": "opencode.headline.percentage < 90",
+          "parent": "opencode-tray-icon",
+          "x": "3",
+          "y": "3",
+          "width": "58",
+          "height": "58",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#2E7D32FF"
+            }
+          },
+          "corner_radius": "1"
+        },
+        {
+          "id": "opencode-tray-high-fill",
+          "name": "OpenCode high-usage white fill",
+          "render": "opencode.headline.percentage >= 90",
+          "parent": "opencode-tray-icon",
+          "x": "3",
+          "y": "3",
+          "width": "58",
+          "height": "58",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFFFF"
+            }
+          },
+          "corner_radius": "1"
+        },
+        {
+          "id": "opencode-tray-placeholder",
+          "name": "OpenCode loading placeholder",
+          "render": "data.poll_ok == 0 || opencode.available == 0",
+          "parent": "opencode-tray-icon",
+          "width": "64",
+          "height": "64",
+          "content": {
+            "type": "text",
+            "template": "O",
+            "font_family": "Arial Bold",
+            "font_size": "50",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "opencode-tray-low-session-value",
+          "name": "opencode 5h percentage",
+          "render": "data.poll_ok && opencode.available && opencode.headline.percentage < 90",
+          "parent": "opencode-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{opencode.session.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "opencode-tray-low-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && opencode.available && opencode.headline.percentage < 90",
+          "parent": "opencode-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#FFFFFF99"
+            }
+          }
+        },
+        {
+          "id": "opencode-tray-low-weekly-value",
+          "name": "opencode 7d percentage",
+          "render": "data.poll_ok && opencode.available && opencode.headline.percentage < 90",
+          "parent": "opencode-tray-icon",
+          "x": "0",
+          "y": "33",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{opencode.weekly.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#FFFFFFFF"
+            }
+          }
+        },
+        {
+          "id": "opencode-tray-high-session-value",
+          "name": "opencode 5h percentage",
+          "render": "data.poll_ok && opencode.available && opencode.headline.percentage >= 90",
+          "parent": "opencode-tray-icon",
+          "x": "0",
+          "y": "1",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{opencode.session.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#1B5E20FF"
+            }
+          }
+        },
+        {
+          "id": "opencode-tray-high-divider",
+          "name": "window divider",
+          "render": "data.poll_ok && opencode.available && opencode.headline.percentage >= 90",
+          "parent": "opencode-tray-icon",
+          "x": "10",
+          "y": "31",
+          "width": "44",
+          "height": "2",
+          "background": {
+            "type": "colour",
+            "colour": {
+              "color": "#1B5E2099"
+            }
+          }
+        },
+        {
+          "id": "opencode-tray-high-weekly-value",
+          "name": "opencode 7d percentage",
+          "render": "data.poll_ok && opencode.available && opencode.headline.percentage >= 90",
+          "parent": "opencode-tray-icon",
+          "x": "0",
+          "y": "33",
+          "width": "64",
+          "height": "30",
+          "content": {
+            "type": "text",
+            "template": "{opencode.weekly.display:0}",
+            "font_family": "Arial Bold",
+            "font_size": "30",
+            "weight": "bold",
+            "align": "center",
+            "color": {
+              "color": "#1B5E20FF"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

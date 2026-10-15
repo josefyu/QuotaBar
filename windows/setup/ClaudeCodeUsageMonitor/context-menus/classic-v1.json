@@ -1,0 +1,388 @@
+{
+  "schema_version": 1,
+  "id": "classic-v1",
+  "name": "Classic v1",
+  "items": [
+    {
+      "id": "refresh",
+      "label": "Refresh",
+      "render": "1",
+      "type": "action",
+      "action": {
+        "type": "refresh"
+      }
+    },
+    {
+      "id": "update-frequency",
+      "label": "Update frequency",
+      "render": "1",
+      "type": "submenu",
+      "items": [
+        {
+          "id": "frequency-1-minute",
+          "label": "Every minute",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "set_update_frequency",
+            "seconds": 60
+          }
+        },
+        {
+          "id": "frequency-5-minutes",
+          "label": "Every 5 minutes",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "set_update_frequency",
+            "seconds": 300
+          }
+        },
+        {
+          "id": "frequency-15-minutes",
+          "label": "Every 15 minutes",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "set_update_frequency",
+            "seconds": 900
+          }
+        },
+        {
+          "id": "frequency-1-hour",
+          "label": "Every hour",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "set_update_frequency",
+            "seconds": 3600
+          }
+        }
+      ]
+    },
+    {
+      "id": "providers",
+      "label": "Providers",
+      "render": "1",
+      "type": "submenu",
+      "items": [
+        {
+          "id": "provider-claude",
+          "label": "Claude Code",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "toggle_provider",
+            "provider": "claude"
+          }
+        },
+        {
+          "id": "provider-codex",
+          "label": "Codex",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "toggle_provider",
+            "provider": "codex"
+          }
+        },
+        {
+          "id": "provider-antigravity",
+          "label": "Antigravity",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "toggle_provider",
+            "provider": "antigravity"
+          }
+        },
+        {
+          "id": "provider-opencode",
+          "label": "OpenCode",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "toggle_provider",
+            "provider": "open_code"
+          }
+        },
+        {
+          "id": "provider-cursor",
+          "label": "Cursor",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "toggle_provider",
+            "provider": "cursor"
+          }
+        }
+      ]
+    },
+    {
+      "id": "accounts",
+      "label": "Accounts",
+      "render": "1",
+      "type": "submenu",
+      "items": [
+        {
+          "id": "account-add-claude",
+          "label": "Add Claude account",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "add_account",
+            "provider": "claude"
+          }
+        },
+        {
+          "id": "account-add-codex",
+          "label": "Add Codex account",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "add_account",
+            "provider": "codex"
+          }
+        },
+        {
+          "id": "accounts-separator",
+          "label": "",
+          "render": "1",
+          "type": "separator"
+        },
+        {
+          "id": "accounts-sign-in",
+          "label": "Sign in to accounts",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "sign_in_accounts"
+          }
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "render": "1",
+      "type": "submenu",
+      "items": [
+        {
+          "id": "start-with-windows",
+          "label": "Start with Windows",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "toggle_startup"
+          }
+        },
+        {
+          "id": "language",
+          "label": "Language",
+          "render": "1",
+          "type": "submenu",
+          "items": [
+            {
+              "id": "language-system",
+              "label": "System default",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "system"
+              }
+            },
+            {
+              "id": "language-en",
+              "label": "English",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "en"
+              }
+            },
+            {
+              "id": "language-nl",
+              "label": "Nederlands",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "nl"
+              }
+            },
+            {
+              "id": "language-es",
+              "label": "Español",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "es"
+              }
+            },
+            {
+              "id": "language-fr",
+              "label": "Français",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "fr"
+              }
+            },
+            {
+              "id": "language-de",
+              "label": "Deutsch",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "de"
+              }
+            },
+            {
+              "id": "language-ja",
+              "label": "日本語",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "ja"
+              }
+            },
+            {
+              "id": "language-ko",
+              "label": "한국어",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "ko"
+              }
+            },
+            {
+              "id": "language-zh-tw",
+              "label": "繁體中文",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "zh-TW"
+              }
+            },
+            {
+              "id": "language-zh-cn",
+              "label": "简体中文",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "zh-CN"
+              }
+            },
+            {
+              "id": "language-ru",
+              "label": "Русский",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "ru"
+              }
+            },
+            {
+              "id": "language-pt-br",
+              "label": "Português (Brasil)",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "pt-BR"
+              }
+            },
+            {
+              "id": "language-tr",
+              "label": "Türkçe",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "tr"
+              }
+            },
+            {
+              "id": "language-pl",
+              "label": "Polski",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "pl"
+              }
+            },
+            {
+              "id": "language-th",
+              "label": "ไทย",
+              "render": "1",
+              "type": "action",
+              "action": {
+                "type": "set_language",
+                "language": "th"
+              }
+            }
+          ]
+        },
+        {
+          "id": "settings-separator",
+          "label": "",
+          "render": "1",
+          "type": "separator"
+        },
+        {
+          "id": "check-updates",
+          "label": "Check for updates",
+          "render": "1",
+          "type": "action",
+          "action": {
+            "type": "check_for_updates"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toggle-widget",
+      "label": "Show widget",
+      "render": "1",
+      "type": "action",
+      "action": {
+        "type": "toggle_widget"
+      }
+    },
+    {
+      "id": "open-dashboard",
+      "label": "Open Dashboard",
+      "render": "1",
+      "type": "action",
+      "action": {
+        "type": "open_dashboard"
+      }
+    },
+    {
+      "id": "root-separator",
+      "label": "",
+      "render": "1",
+      "type": "separator"
+    },
+    {
+      "id": "exit",
+      "label": "Exit",
+      "render": "1",
+      "type": "action",
+      "action": {
+        "type": "exit"
+      }
+    }
+  ]
+}

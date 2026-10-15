@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "dashboard-v2",
+  "name": "Dashboard v2",
+  "items": [
+    {
+      "id": "open-dashboard",
+      "label": "Open Dashboard",
+      "render": "1",
+      "type": "action",
+      "action": {
+        "type": "open_dashboard"
+      }
+    },
+    {
+      "id": "dashboard-separator",
+      "label": "",
+      "render": "1",
+      "type": "separator"
+    },
+    {
+      "id": "exit",
+      "label": "Exit",
+      "render": "1",
+      "type": "action",
+      "action": {
+        "type": "exit"
+      }
+    }
+  ]
+}
