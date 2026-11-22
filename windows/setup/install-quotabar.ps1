@@ -1,65 +1,62 @@
-# QuotaBar setup for a second Windows machine (e.g. Zenbook).
-# Run in PowerShell from this folder:
+# QuotaBar fuer Windows installieren. In PowerShell aus diesem Ordner:
 #   powershell -ExecutionPolicy Bypass -File .\install-quotabar.ps1
-# Optional: -Tag v2.13.44-quotabar.2   (default: latest release)
+# Optional: -Tag v2.13.44-quotabar.2   (Standard: neueste Release)
 #
-# The bundled settings use neutral account labels ("Konto 1-3") and config
-# folders (~\.claude-konto1-3). Sign in per account with
-#   $env:CLAUDE_CONFIG_DIR="$HOME\.claude-konto1"; claude
-# or point config_dir in settings.json at your existing folders.
+# Eigene Einstellungen (echte Kontonamen, Layout): Ordner "meine-einstellungen"
+# neben dieses Skript legen (Inhalt wie %APPDATA%\ClaudeCodeUsageMonitor).
+# Er hat Vorrang vor der neutralen Vorlage und steht in .gitignore.
 
 param([string]$Tag = "latest")
 
 $ErrorActionPreference = "Stop"
-$repo     = "josefyu/QuotaBar"
-$exeName  = "claude-code-usage-monitor.exe"
+$repo       = "josefyu/QuotaBar"
+$exeName    = "claude-code-usage-monitor.exe"
 $installDir = Join-Path $env:LOCALAPPDATA "QuotaBar"
-$appData  = Join-Path $env:APPDATA "ClaudeCodeUsageMonitor"
-$here     = Split-Path -Parent $MyInvocation.MyCommand.Path
+$appData    = Join-Path $env:APPDATA "ClaudeCodeUsageMonitor"
+$here       = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# 1. Download release exe + checksum
+# 1. Release-Exe laden und Pruefsumme kontrollieren
 $base = if ($Tag -eq "latest") { "https://github.com/$repo/releases/latest/download" }
         else { "https://github.com/$repo/releases/download/$Tag" }
 New-Item -ItemType Directory -Force $installDir | Out-Null
 $exe = Join-Path $installDir $exeName
 Get-Process claude-code-usage-monitor -ErrorAction SilentlyContinue | Stop-Process -Force
-Write-Host "Downloading $base/$exeName"
+Write-Host "Lade $base/$exeName"
 Invoke-WebRequest "$base/$exeName" -OutFile $exe -UseBasicParsing
-$expected = ((Invoke-WebRequest "$base/$exeName.sha256" -UseBasicParsing).Content -split '\s+')[0].Trim().ToLower()
-$actual = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
-if ($expected -ne $actual) { throw "SHA256 mismatch: expected $expected, got $actual" }
-Write-Host "Checksum OK"
+$shaRaw = (Invoke-WebRequest "$base/$exeName.sha256" -UseBasicParsing).Content
+if ($shaRaw -is [byte[]]) { $shaRaw = [Text.Encoding]::ASCII.GetString($shaRaw) }  # PS 5.1 liefert Bytes
+$expected = ($shaRaw -split '\s+')[0].Trim().ToLower()
+$actual   = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+if ($expected -ne $actual) { throw "SHA256 stimmt nicht: erwartet $expected, erhalten $actual" }
+Write-Host "Pruefsumme OK"
 
-# 2. Copy settings + themes from the Fujitsu, rewriting the user path
-$src = Join-Path $here "ClaudeCodeUsageMonitor"
+# 2. Einstellungen: eigene (meine-einstellungen) oder neutrale Vorlage
+$mine = Join-Path $here "meine-einstellungen"
+$src  = if (Test-Path $mine) { $mine } else { Join-Path $here "ClaudeCodeUsageMonitor" }
 if (Test-Path $src) {
     if (Test-Path $appData) {
         $bak = "$appData.bak-$(Get-Date -Format yyyyMMdd-HHmmss)"
         Copy-Item $appData $bak -Recurse
-        Write-Host "Existing config backed up to $bak"
+        Write-Host "Bisherige Konfiguration gesichert: $bak"
     }
     New-Item -ItemType Directory -Force $appData | Out-Null
     Copy-Item (Join-Path $src "*") $appData -Recurse -Force
     $settings = Join-Path $appData "settings.json"
-    $json = Get-Content $settings -Raw
-    $json = $json.Replace('C:\\Users\\fujitsu', ($HOME -replace '\\', '\\'))
+    # Benutzerpfad in der JSON-Datei (maskierte Backslashes) auf diesen Rechner setzen
+    $json = [regex]::Replace((Get-Content $settings -Raw), 'C:\\\\Users\\\\[^\\]+', $HOME.Replace('\', '\\'))
     [IO.File]::WriteAllText($settings, $json)
-    Write-Host "Settings and themes installed"
-
-    # Warn about account folders that don't exist on this machine yet
-    $cfg = $json | ConvertFrom-Json
-    foreach ($p in $cfg.accounts.claude.profiles) {
-        if ($p.config_dir -and -not (Test-Path $p.config_dir)) {
-            Write-Warning "Account '$($p.name)': $($p.config_dir) missing - sign in with CLAUDE_CONFIG_DIR=$($p.config_dir) claude"
-        }
-    }
+    Write-Host "Einstellungen installiert aus: $src"
 }
 
-# 3. Autostart + desktop shortcut
+# 3. Login-Hilfe, Autostart, Desktop-Symbole
+foreach ($f in "QuotaBar-Login.ps1", "QuotaBar-Login.cmd") { Copy-Item (Join-Path $here $f) $installDir -Force }
 Set-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Run -Name ClaudeCodeUsageMonitor -Value $exe
-$lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath("Desktop")) "QuotaBar.lnk"))
-$lnk.TargetPath = $exe
-$lnk.Save()
+$desktop = [Environment]::GetFolderPath("Desktop")
+$sh = New-Object -ComObject WScript.Shell
+$l1 = $sh.CreateShortcut((Join-Path $desktop "QuotaBar.lnk"));       $l1.TargetPath = $exe; $l1.Save()
+$l2 = $sh.CreateShortcut((Join-Path $desktop "QuotaBar Login.lnk")); $l2.TargetPath = (Join-Path $installDir "QuotaBar-Login.cmd"); $l2.Save()
 
 Start-Process $exe
-Write-Host "QuotaBar running from $exe"
+Write-Host "`nQuotaBar laeuft: $exe`nKonten-Status:"
+& (Join-Path $installDir "QuotaBar-Login.ps1") -Status
+Write-Host "`nFehlt ein Konto: Desktop-Symbol 'QuotaBar Login' doppelklicken."

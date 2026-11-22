@@ -34,3 +34,7 @@ AGENTS.md
 # Local WinGet manifest generation output
 /manifests/
 test_bin/
+
+# Persoenliche Windows-Einstellungen und Logins (nie committen)
+windows/setup/meine-einstellungen/
+.credentials.json
