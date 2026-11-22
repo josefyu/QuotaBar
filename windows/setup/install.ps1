@@ -1,23 +1,42 @@
-# QuotaBar fuer Windows installieren. In PowerShell aus diesem Ordner:
-#   powershell -ExecutionPolicy Bypass -File .\install-quotabar.ps1
-# Optional: -Tag v2.13.44-quotabar.2   (Standard: neueste Release)
+# QuotaBar fuer Windows installieren.
 #
-# Eigene Einstellungen (echte Kontonamen, Layout): Ordner "meine-einstellungen"
-# neben dieses Skript legen (Inhalt wie %APPDATA%\ClaudeCodeUsageMonitor).
-# Er hat Vorrang vor der neutralen Vorlage und steht in .gitignore.
-
-param([string]$Tag = "latest")
+#   irm https://raw.githubusercontent.com/josefyu/QuotaBar/main/windows/setup/install.ps1 | iex
+#
+# Optionen (vor dem Einzeiler setzen, gelten nur fuer diese PowerShell):
+#   $env:QUOTABAR_TAG = "v2.13.44-quotabar.2"   # bestimmte Release statt der neuesten
+#   $env:QUOTABAR_SETTINGS = "D:\pfad\ordner"   # eigene Einstellungen (siehe README)
+# Lokal aus einem Klon: powershell -ExecutionPolicy Bypass -File .\install.ps1
+#
+# Eigene Einstellungen haben Vorrang vor der neutralen Vorlage. Gesucht wird in:
+# $env:QUOTABAR_SETTINGS, "meine-einstellungen" neben dem Skript, $HOME\meine-einstellungen.
+# Diese Ordner gehoeren nie ins Repo.
 
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"   # Fortschrittsanzeige macht Downloads in PS 5.1 langsam
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $repo       = "josefyu/QuotaBar"
 $exeName    = "claude-code-usage-monitor.exe"
+$tag        = if ($env:QUOTABAR_TAG) { $env:QUOTABAR_TAG } else { "latest" }
 $installDir = Join-Path $env:LOCALAPPDATA "QuotaBar"
 $appData    = Join-Path $env:APPDATA "ClaudeCodeUsageMonitor"
-$here       = Split-Path -Parent $MyInvocation.MyCommand.Path
+$tmp        = Join-Path $env:TEMP "quotabar-install"
+
+# 0. Quelle der Setup-Dateien: lokaler Klon oder ZIP von GitHub (bei irm | iex)
+if ($MyInvocation.MyCommand.Path) {
+    $here = Split-Path -Parent $MyInvocation.MyCommand.Path
+} else {
+    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force $tmp | Out-Null
+    $ref = if ($tag -eq "latest") { "heads/main" } else { "tags/$tag" }
+    Write-Host "Lade Setup-Dateien ($ref)"
+    Invoke-WebRequest "https://github.com/$repo/archive/refs/$ref.zip" -OutFile "$tmp\src.zip" -UseBasicParsing
+    Expand-Archive "$tmp\src.zip" "$tmp\src" -Force
+    $here = (Get-ChildItem "$tmp\src" -Directory | Select-Object -First 1).FullName + "\windows\setup"
+}
 
 # 1. Release-Exe laden und Pruefsumme kontrollieren
-$base = if ($Tag -eq "latest") { "https://github.com/$repo/releases/latest/download" }
-        else { "https://github.com/$repo/releases/download/$Tag" }
+$base = if ($tag -eq "latest") { "https://github.com/$repo/releases/latest/download" }
+        else { "https://github.com/$repo/releases/download/$tag" }
 New-Item -ItemType Directory -Force $installDir | Out-Null
 $exe = Join-Path $installDir $exeName
 Get-Process claude-code-usage-monitor -ErrorAction SilentlyContinue | Stop-Process -Force
@@ -30,9 +49,10 @@ $actual   = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
 if ($expected -ne $actual) { throw "SHA256 stimmt nicht: erwartet $expected, erhalten $actual" }
 Write-Host "Pruefsumme OK"
 
-# 2. Einstellungen: eigene (meine-einstellungen) oder neutrale Vorlage
-$mine = Join-Path $here "meine-einstellungen"
-$src  = if (Test-Path $mine) { $mine } else { Join-Path $here "ClaudeCodeUsageMonitor" }
+# 2. Einstellungen: eigene oder neutrale Vorlage
+$src = @($env:QUOTABAR_SETTINGS, (Join-Path $here "meine-einstellungen"), (Join-Path $HOME "meine-einstellungen")) |
+    Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+if (-not $src) { $src = Join-Path $here "ClaudeCodeUsageMonitor" }
 if (Test-Path $src) {
     if (Test-Path $appData) {
         $bak = "$appData.bak-$(Get-Date -Format yyyyMMdd-HHmmss)"
@@ -60,3 +80,4 @@ Start-Process $exe
 Write-Host "`nQuotaBar laeuft: $exe`nKonten-Status:"
 & (Join-Path $installDir "QuotaBar-Login.ps1") -Status
 Write-Host "`nFehlt ein Konto: Desktop-Symbol 'QuotaBar Login' doppelklicken."
+Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
