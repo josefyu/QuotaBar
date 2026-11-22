@@ -4,6 +4,12 @@ Notable changes to Claude Code Usage Monitor are documented here, newest first.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), with
 changes grouped into Added, Changed, Fixed, and Removed where applicable.
 
+## [2.13.44-quotabar.3] - 2026-11-22
+
+### Fixed
+
+- Fewer "too many requests" errors on the first start with several Claude accounts. Accounts are now polled 5 s apart instead of 2 s, and an account that gets a 429 waits 15 s and retries once, instead of showing the error until the next refresh a minute later.
+
 ## [2.13.44-quotabar.2] - 2026-10-05
 
 ### Fixed

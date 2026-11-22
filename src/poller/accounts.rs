@@ -79,9 +79,18 @@ where
 /// How much later each additional account of one provider starts its poll.
 /// Tests run without the wait, so they stay as quick as the rest of the suite.
 #[cfg(not(test))]
-const ACCOUNT_POLL_STAGGER: std::time::Duration = std::time::Duration::from_millis(2_000);
+const ACCOUNT_POLL_STAGGER: std::time::Duration = std::time::Duration::from_millis(5_000);
 #[cfg(test)]
 const ACCOUNT_POLL_STAGGER: std::time::Duration = std::time::Duration::ZERO;
+
+/// How long an account waits before its single retry after a 429. A fresh
+/// start asks every account at once and the first round is often rate limited;
+/// a short pause lets the second try succeed instead of waiting for the next
+/// refresh a minute later.
+#[cfg(not(test))]
+const RATE_LIMIT_RETRY_PAUSE: std::time::Duration = std::time::Duration::from_millis(15_000);
+#[cfg(test)]
+const RATE_LIMIT_RETRY_PAUSE: std::time::Duration = std::time::Duration::ZERO;
 
 fn poll_accounts_with_progress<F>(
     enabled: ProviderSet,
@@ -203,6 +212,17 @@ where
                     // a response (or a stale reading) with replaced credentials.
                     signature = current_signature;
                     result = Err(PollError::RequestFailed);
+                }
+                if paused_error.is_none() && matches!(result, Err(PollError::HttpStatus(429))) {
+                    std::thread::sleep(RATE_LIMIT_RETRY_PAUSE);
+                    if let Ok(path) = &target.path {
+                        result = poll(target.provider, path.as_deref());
+                        // Same rule as above: a response is only valid for the
+                        // credentials it was requested with.
+                        if target.signature() != signature {
+                            result = Err(PollError::RequestFailed);
+                        }
+                    }
                 }
                 for target in group {
                     let _ = sender.send((index, target.clone(), signature.clone(), result.clone()));
@@ -655,6 +675,39 @@ mod tests {
                 assert!(fresh.accounts[1].usage.as_ref().unwrap().stale);
             }
         }
+    }
+
+    #[test]
+    fn rate_limit_on_first_try_is_retried_once() {
+        let settings = settings();
+        let calls = AtomicUsize::new(0);
+        let data = poll_accounts_with(ProviderSet::default(), &settings, |_, _| {
+            if calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                Err(PollError::HttpStatus(429))
+            } else {
+                Ok(usage(20.0))
+            }
+        })
+        .unwrap();
+        assert!(data.accounts.iter().all(|account| account.error.is_none()));
+        // 429 answers the first request only: one extra call, not a retry storm.
+        assert_eq!(calls.load(Ordering::SeqCst), data.accounts.len() + 1);
+    }
+
+    #[test]
+    fn persistent_rate_limit_is_retried_only_once_per_account() {
+        let settings = settings();
+        let calls = AtomicUsize::new(0);
+        let data = poll_accounts_with(ProviderSet::default(), &settings, |_, _| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            Err(PollError::HttpStatus(429))
+        })
+        .unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), data.accounts.len() * 2);
+        assert!(data
+            .accounts
+            .iter()
+            .all(|account| account.error == Some(PollError::HttpStatus(429))));
     }
 
     #[test]
